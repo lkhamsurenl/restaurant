@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where We've Eaten</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbf9f6; --fg: #1c1a18; --muted: #6f6a63;
+    --card: #ffffff; --line: #e7e1d8; --accent: #b4552d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #17161a; --fg: #ecebe8; --muted: #9b9892;
+            --card: #201f25; --line: #34313b; --accent: #e08a5f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 16px/1.6 ui-serif, Georgia, serif; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+  h1 { font-size: 2rem; margin: 0 0 .25rem; letter-spacing: -.02em; }
+  .sub { color: var(--muted); margin: 0 0 2.5rem; font-size: .95rem; }
+  h2 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: .1em;
+       color: var(--muted); font-weight: 600; margin: 3rem 0 .5rem;
+       padding-bottom: .5rem; border-bottom: 1px solid var(--line); }
+  h2 .qual { text-transform: none; letter-spacing: 0; font-weight: 400; }
+  h3 { font-size: 1.15rem; margin: 2rem 0 1rem; font-weight: 600; }
+  h3 .count { color: var(--muted); font-weight: 400; font-size: .85rem; }
+  .grid { display: grid; gap: 1rem;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line);
+          border-radius: 10px; padding: 1rem 1.1rem; }
+  .card .name { font-weight: 600; font-size: 1.05rem; }
+  .card a.name { color: inherit; text-decoration: none; }
+  .card a.name:hover { color: var(--accent); }
+  .meta { color: var(--muted); font-size: .85rem; margin-top: .15rem; }
+  .note { margin-top: .6rem; font-size: .95rem; }
+  .dishes { margin-top: .4rem; font-size: .85rem; color: var(--muted); font-style: italic; }
+  .stars { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; font-size: .7rem; text-transform: uppercase;
+          letter-spacing: .06em; padding: .12rem .45rem; border-radius: 4px;
+          border: 1px solid var(--line); color: var(--muted); margin-left: .35rem;
+          vertical-align: .1em; }
+  .pill.off { border-color: var(--accent); color: var(--accent); }
+  .why { margin-top: .6rem; font-size: .92rem; }
+  .why b { font-weight: 600; color: var(--muted); font-size: .78rem;
+           text-transform: uppercase; letter-spacing: .06em; display: block; }
+  .scatter { width: 100%; height: auto; margin: .5rem 0 1.5rem;
+             background: var(--card); border-radius: 10px; }
+  .chips span { display: inline-block; font-size: .75rem; padding: .1rem .4rem;
+                border: 1px solid var(--line); border-radius: 999px;
+                margin: .2rem .2rem 0 0; color: var(--muted); }
+  .stats { display: flex; flex-wrap: wrap; gap: 1.5rem; margin: 0 0 1rem;
+           color: var(--muted); font-size: .9rem; }
+  .stats b { color: var(--fg); font-size: 1.3rem; display: block;
+             font-variant-numeric: tabular-nums; }
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--line);
+           color: var(--muted); font-size: .82rem; }
+  footer a { color: var(--muted); }
+  table { width: 100%; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Where We've Eaten</h1>
+  <p class="sub">A personal record of where we've eaten, and what was worth it.</p>
+
+  <div class="stats">
+    <div><b>10</b> places</div>
+    <div><b>2</b> cities</div>
+    <div><b>8</b> rated 4+</div>
+    <div><b>4.2</b> average</div>
+  </div>
+
+  
+  <h2>Recommended near 96707, Honolulu County, Hawaii, United States
+    <span class="qual">— within 30km,
+    140 of 668 venues considered</span>
+  </h2>
+  <div class="grid">
+  
+    <div class="card">
+      
+      <a class="name" href="https://www.openstreetmap.org/node/14113945404">Han no Daidokoro</a>
+      
+      
+      <div class="meta">
+        japanese, barbecue
+         · 27.9km
+        · 55% confidence
+      </div>
+      <div class="why"><b>Why</b>Onkee Korean Grill House was a 5 for you — tabletop grilling, good value, no wait — and this is the refined Japanese version of that same meal: A5 wagyu yakiniku grilled at the table with staff walking you through each cut. It also answers the one complaint that shows up again and again in your notes (Katsumidori 'interior is a little outdated', Roy's Ko Olina 'interior was outdated') with a genuinely polished modern room.</div>
+      <div class="why"><b>Avoids</b>The dated, worn-in dining rooms you flagged at Katsumidori Sushi Tokyo and Roy's Ko Olina; this is a new, design-forward space.</div>
+      <div class="why"><b>Order</b>The wagyu course with the sukiyaki-style sirloin over rice and egg</div>
+    </div>
+  
+    <div class="card">
+      
+      <a class="name" href="https://www.openstreetmap.org/node/6983742485">MW Restaurant</a>
+      
+      
+      <div class="meta">
+        hawaiian
+         · 24.6km
+        · 60% confidence
+      </div>
+      <div class="why"><b>Why</b>This is the upgrade on Roy's Ko Olina (4/5 — 'high quality, presentation was good, dessert was great, interior outdated'): same modern Hawaii-regional cooking and plating, a famously strong pastry program, but in a calm, contemporary room instead of a tired one. It also extends the Rigo Spanish Italian thread of a real kitchen doing careful, composed plates.</div>
+      <div class="why"><b>Avoids</b>The 'too noisy / music too loud' problem you docked Restaurant 604 and Monkeypod Kitchen for — MW is a conversation-level dining room.</div>
+      <div class="why"><b>Order</b>The MW candy bar dessert, and the mochi-crusted local fish</div>
+    </div>
+  
+    <div class="card">
+      
+      <a class="name" href="https://www.openstreetmap.org/node/11892532415">Mud Hen Water</a>
+      
+      
+      <div class="meta">
+        regional, hawaiian, filipino
+         · 30.0km
+        · 55% confidence
+      </div>
+      <div class="why"><b>Why</b>The Kini Room got a 5 for mocktails, happy hour, terrace seating and atmosphere; this is the Kaimuki equivalent — an inventive non-alcoholic and craft drink list, small shared plates built on local ingredients, and open-air seating. It scratches the same 'good drinks plus interesting food in a room you want to sit in' itch, with the island produce angle Roy's hinted at.</div>
+      <div class="why"><b>Avoids</b>The loud-music, volume-over-food feel that dropped Monkeypod Kitchen to a 3; this is a small neighborhood room, not a party bar.</div>
+      <div class="why"><b>Order</b>The 'ulu (breadfruit) dish and the kalua pig with greens</div>
+    </div>
+  
+    <div class="card">
+      
+      <a class="name" href="https://www.openstreetmap.org/node/5039089521">Tonkatsu Tamafuji Kapahulu</a>
+      
+      
+      <div class="meta">
+        japanese
+         · 28.9km
+        · 55% confidence
+      </div>
+      <div class="why"><b>Why</b>Your two 5s and 4s in Japanese are both sushi (Ginza Onodera, Katsumidori) — what the notes actually praise is precision and freshness, not raw fish specifically. Tamafuji is the same obsessive Japanese single-dish craftsmanship applied to Hokkaido-style tonkatsu: pick your pork, grind your own sesame, exacting frying. A new slot rather than a fifth sushi bar.</div>
+      <div class="why"><b>Avoids</b>The 'food was ok, nothing amazing' middling-kitchen feeling of Restaurant 604; this is a specialist that does one thing extremely well.</div>
+      <div class="why"><b>Order</b>Kurobuta rosu katsu set with the cabbage refills</div>
+    </div>
+  
+    <div class="card">
+      
+      <a class="name" href="https://www.openstreetmap.org/node/3646661448">‘AMA‘AMA – Contemporary Island Cooking</a>
+      
+      
+      <div class="meta">
+        fish
+         · 3.9km
+        · 45% confidence
+      </div>
+      <div class="why"><b>Why</b>Keeps one pick close to home in Ko Olina so you are not always driving to town. It is the same bracket as Roy's Ko Olina (4/5, 'high quality, pricier side, would recommend') — contemporary island seafood, careful presentation — but with the oceanfront open-air setting and drinks program that made The Kini Room a 5 for you.</div>
+      <div class="why"><b>Avoids</b>The dated interior you knocked Roy's Ko Olina for; this room is open to the lagoon rather than enclosed and worn.</div>
+      
+    </div>
+  
+    <div class="card">
+      
+      <a class="name" href="https://www.openstreetmap.org/node/10892005639">Mimi's Peruvian Cuisine</a>
+      
+      
+      <div class="meta">
+        peruvian
+         · 25.8km
+        · 40% confidence
+      </div>
+      <div class="why"><b>Why</b>Rigo Spanish Italian was a 5 and cino a 4, so Mediterranean-European flavor is clearly your lane; Peruvian is the logical unexplored extension — citrus-cured seafood and Spanish-rooted stews, with the Japanese-influenced tiradito style that connects to your sushi scores. It is a small family kitchen, so expect food over decor.</div>
+      <div class="why"><b>Avoids</b>The big, echoing, music-driven rooms that got Monkeypod Kitchen and Restaurant 604 only 3s — this is a quiet, small dining room.</div>
+      <div class="why"><b>Order</b>Ceviche mixto, then lomo saltado</div>
+    </div>
+  
+  </div>
+  
+
+  <h2>The library</h2>
+  
+    <h3>Honolulu, Hawaii <span class="count">— 8 places</span></h3>
+    <svg class="scatter" viewBox="0 0 440 240" role="img" aria-label="Approximate locations of these places"><rect x="1" y="1" width="438" height="238" fill="none" stroke="var(--line)" rx="6"/><circle cx="352.2" cy="201.7" r="6" fill="#2f7d5c" fill-opacity=".85" stroke="var(--card)" stroke-width="1.5"><title>Kaiten Sushi Ginza Onodera (5/5)</title></circle><circle cx="270.4" cy="191.6" r="6" fill="#2f7d5c" fill-opacity=".85" stroke="var(--card)" stroke-width="1.5"><title>Onkee Korean Grill House (5/5)</title></circle><circle cx="368.2" cy="220.6" r="6" fill="#2f7d5c" fill-opacity=".85" stroke="var(--card)" stroke-width="1.5"><title>Rigo Spanish Italian (5/5)</title></circle><circle cx="323.9" cy="232.0" r="6" fill="#2f7d5c" fill-opacity=".85" stroke="var(--card)" stroke-width="1.5"><title>The Kini Room (5/5)</title></circle><circle cx="304.8" cy="214.6" r="6" fill="#6aa84f" fill-opacity=".85" stroke="var(--card)" stroke-width="1.5"><title>Katsumidori Sushi Tokyo (4/5)</title></circle><circle cx="252.7" cy="183.1" r="6" fill="#6aa84f" fill-opacity=".85" stroke="var(--card)" stroke-width="1.5"><title>Moku Kitchen (4/5)</title></circle><circle cx="272.5" cy="188.1" r="6" fill="#6aa84f" fill-opacity=".85" stroke="var(--card)" stroke-width="1.5"><title>cino (4/5)</title></circle><circle cx="71.8" cy="8.0" r="4.5" fill="#c9a227" fill-opacity=".85" stroke="var(--card)" stroke-width="1.5"><title>Restaurant 604 (3/5)</title></circle><line x1="20" y1="222" x2="136" y2="222" stroke="var(--muted)" stroke-width="2"/><text x="20" y="216" font-size="10" fill="var(--muted)">5km</text></svg>
+    <div class="grid">
+    
+      <div class="card">
+        
+        <a class="name" href="https://www.openstreetmap.org/node/11764853305">Kaiten Sushi Ginza Onodera</a>
+        
+        
+        <div class="meta">
+          <span class="stars">5/5</span> · 
+          
+          Honolulu
+          
+        </div>
+        
+        <div class="chips"><span>sushi</span></div>
+        
+        <div class="note">Great sushi, always fresh, super friendly, nice interior.</div>
+        
+      </div>
+    
+      <div class="card">
+        
+        <a class="name" href="https://www.openstreetmap.org/?mlat=21.29512&mlon=-157.85435#map=18/21.29512/-157.85435">Onkee Korean Grill House</a>
+        
+        
+        <div class="meta">
+          <span class="stars">5/5</span> · 
+          
+          Honolulu
+          
+        </div>
+        
+        <div class="note">Very good food, there is never a line. Lunch specials are good deals as well.</div>
+        
+      </div>
+    
+      <div class="card">
+        
+        <a class="name" href="https://www.openstreetmap.org/node/11104000547">Rigo Spanish Italian</a>
+        
+        
+        <div class="meta">
+          <span class="stars">5/5</span> · 
+          
+          Honolulu
+          
+        </div>
+        
+        <div class="chips"><span>spanish</span><span>italian</span></div>
+        
+        <div class="note">Mocktails and food options were great, very tasty. Excellent atmosphere. Spanish-Italian.</div>
+        
+      </div>
+    
+      <div class="card">
+        
+        <a class="name" href="https://www.openstreetmap.org/?mlat=21.27943&mlon=-157.83208#map=18/21.27943/-157.83208">The Kini Room</a>
+        
+        
+        <div class="meta">
+          <span class="stars">5/5</span> · 
+          
+          Honolulu
+          
+        </div>
+        
+        <div class="note">Great mocktails, happy hour menu was great. Terrace seating is a plus. Live music and beautiful interior.</div>
+        
+      </div>
+    
+      <div class="card">
+        
+        <a class="name" href="https://www.openstreetmap.org/?mlat=21.28617&mlon=-157.84002#map=18/21.28617/-157.84002">Katsumidori Sushi Tokyo</a>
+        
+        
+        <div class="meta">
+          <span class="stars">4/5</span> · 
+          
+          Honolulu
+          
+        </div>
+        
+        <div class="note">Interior is a little outdated. Sushi is great, they have a tablet you can use to order.</div>
+        
+      </div>
+    
+      <div class="card">
+        
+        <a class="name" href="https://www.openstreetmap.org/node/5841474921">Moku Kitchen</a>
+        
+        
+        <div class="meta">
+          <span class="stars">4/5</span> · 
+          
+          Honolulu
+          
+        </div>
+        
+        <div class="note">Pizza is good, dog friendly.</div>
+        
+      </div>
+    
+      <div class="card">
+        
+        <a class="name" href="https://www.openstreetmap.org/?mlat=21.29644&mlon=-157.85346#map=18/21.29644/-157.85346">cino</a>
+        
+        
+        <div class="meta">
+          <span class="stars">4/5</span> · 
+          
+          Honolulu
+          
+        </div>
+        
+        <div class="note">Food options were good, interior was kinda dark. Authentic Italian food.</div>
+        
+      </div>
+    
+      <div class="card">
+        
+        <a class="name" href="https://www.openstreetmap.org/?mlat=21.36632&mlon=-157.93706#map=18/21.36632/-157.93706">Restaurant 604</a>
+        
+        
+        <div class="meta">
+          <span class="stars">3/5</span> · 
+          
+          Honolulu
+          
+        </div>
+        
+        <div class="note">Too noisy, food was ok, nothing amazing though.</div>
+        
+      </div>
+    
+    </div>
+  
+    <h3>Kapolei, Hawaii <span class="count">— 2 places</span></h3>
+    <svg class="scatter" viewBox="0 0 440 240" role="img" aria-label="Approximate locations of these places"><rect x="1" y="1" width="438" height="238" fill="none" stroke="var(--line)" rx="6"/><circle cx="163.3" cy="8.0" r="6" fill="#6aa84f" fill-opacity=".85" stroke="var(--card)" stroke-width="1.5"><title>Roy's Ko Olina (4/5)</title></circle><circle cx="276.7" cy="232.0" r="4.5" fill="#c9a227" fill-opacity=".85" stroke="var(--card)" stroke-width="1.5"><title>Monkeypod Kitchen (3/5)</title></circle><line x1="20" y1="222" x2="187" y2="222" stroke="var(--muted)" stroke-width="2"/><text x="20" y="216" font-size="10" fill="var(--muted)">0.5km</text></svg>
+    <div class="grid">
+    
+      <div class="card">
+        
+        <a class="name" href="https://www.openstreetmap.org/?mlat=21.34764&mlon=-158.12676#map=18/21.34764/-158.12676">Roy's Ko Olina</a>
+        
+        
+        <div class="meta">
+          <span class="stars">4/5</span> · 
+          
+          Kapolei
+          
+        </div>
+        
+        <div class="note">Very good food, dessert was great, presentation was good. Interior was outdated. High quality, bit on the pricier side, but would recommend.</div>
+        
+      </div>
+    
+      <div class="card">
+        
+        <a class="name" href="https://www.openstreetmap.org/node/5616138029">Monkeypod Kitchen</a>
+        
+        
+        <div class="meta">
+          <span class="stars">3/5</span> · 
+          
+          Kapolei
+          
+        </div>
+        
+        <div class="note">Food was good, music was too loud</div>
+        
+      </div>
+    
+    </div>
+  
+
+  <footer>
+    Recommendations generated 2026-09-23T07:18:03+00:00 with claude-opus-5,
+    chosen from real venues near 96707, Honolulu County, Hawaii, United States.<br>
+    Venue data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>
+    contributors, <a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>.
+  </footer>
+</div>
+</body>
+</html>

@@ -154,7 +154,9 @@ TEMPLATE = Template(
 <body>
 <div class="wrap">
   <h1>{{ title }}</h1>
-  <p class="sub">A personal record of where we've eaten, and what was worth it.</p>
+  <p class="sub">A personal record of where we've eaten, and what was worth it.
+  {%- if household.has_constraints %} Every suggestion below has to feed a
+  {{ household.diets|join(' and ') }} diner.{% endif %}</p>
 
   <div class="stats">
     <div><b>{{ places|length }}</b> places</div>
@@ -185,6 +187,7 @@ TEMPLATE = Template(
       <div class="why"><b>Why</b>{{ rec.reason }}</div>
       <div class="why"><b>Avoids</b>{{ rec.avoids }}</div>
       {% if rec.dish %}<div class="why"><b>Order</b>{{ rec.dish }}</div>{% endif %}
+      {% if rec.diet_fit %}<div class="why"><b>{{ diet_label }}</b>{{ rec.diet_fit }}</div>{% endif %}
     </div>
   {% endfor %}
   </div>
@@ -306,6 +309,12 @@ def render(
         recs=recs,
         picks=picks,
         withheld=(len(recs.recommendations) - len(picks)) if recs else 0,
+        household=library.household,
+        diet_label=(
+            " / ".join(library.household.diets)
+            if library.household.has_constraints
+            else "Diet"
+        ),
     )
     output = output_dir / "index.html"
     output.write_text(html)

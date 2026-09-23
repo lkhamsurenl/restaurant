@@ -12,6 +12,7 @@ from . import candidates as candidates_mod
 from . import nominatim, osm, overpass, store
 from .geo import haversine_km
 from .models import (
+    Household,
     LocationSource,
     Ratings,
     Recommendations,
@@ -382,6 +383,51 @@ def _from_recommendations(name: str) -> Restaurant | None:
     return None
 
 
+@main.command()
+@click.option("--diet", "diets", multiple=True,
+              help="A standing dietary requirement, e.g. pescatarian. Repeatable.")
+@click.option("--note", "-n", help="Nuance: how strict, who it applies to, the bar.")
+@click.option("--clear", is_flag=True, help="Remove all dietary requirements.")
+def household(diets, note, clear) -> None:
+    """Set standing requirements that apply to every recommendation.
+
+    A diet belongs here rather than on individual restaurants: it describes who is
+    eating, and it disqualifies a place outright rather than scoring it down. It is
+    also the one constraint the model is required to answer for every pick.
+    """
+    library = store.load()
+
+    if clear:
+        library.household = Household()
+        store.save(library)
+        click.echo("Cleared all dietary requirements.")
+        return
+
+    if not diets and note is None:
+        if library.household.has_constraints:
+            click.echo(f"Dietary requirement: {library.household.describe()}")
+            click.echo(
+                "Every recommendation must name dishes this diner can eat, or it is "
+                "dropped."
+            )
+        else:
+            click.echo("No dietary requirements set.")
+            click.echo('Set one with: eats household --diet pescatarian')
+        return
+
+    if diets:
+        library.household.diets = list(diets)
+    if note is not None:
+        library.household.notes = note or None
+    store.save(library)
+
+    click.echo(f"Dietary requirement: {library.household.describe()}")
+    click.echo(
+        "Recommendations must now name specific dishes this diner can order. Picks "
+        "that can't are dropped, and meat-built venues are pushed down the shortlist."
+    )
+
+
 @main.command(name="list")
 @click.option("--min-rating", type=click.IntRange(1, 5), help="Only places rated at least this.")
 @click.option("--skipped", is_flag=True, help="Show the not-interested list instead.")
@@ -557,6 +603,8 @@ def recommend(target, count, radius_km, limit, kinds, chains, off_list, dry_run,
         click.echo(f"    avoids: {rec.avoids}")
         if rec.dish:
             click.echo(f"    order:  {rec.dish}")
+        if rec.diet_fit:
+            click.echo(f"    diet:   {rec.diet_fit}")
         click.echo()
 
     if result.dropped:

@@ -90,6 +90,23 @@ closed. Prefer `fresh` when a pick is otherwise a coin flip, and if you pick a \
 stale one anyway, say why in `reason`.
 - Spread the picks. Do not return eight versions of the same meal.
 
+If a DIETARY REQUIREMENT is given, it is a hard constraint and it outranks \
+everything else here, taste included:
+- Every pick must have real dishes someone on that diet can order - not a side \
+salad, not "they could probably adapt something". A substantial main.
+- A restaurant built around what they cannot eat is disqualified no matter how \
+good it is or how well it matches on every other axis. A tonkatsu specialist, a \
+yakiniku house or a fried-chicken place is the wrong answer for a pescatarian \
+even when the cooking is excellent, because there is nothing there for one of the \
+party to eat.
+- Use what you know about each venue's actual menu. The candidate data cannot tell \
+you this: OpenStreetMap diet tags are present on well under 1% of these venues, so \
+their absence means nothing and you must not read it as a signal either way.
+- Fill in `diet_fit` for every pick, naming the specific dishes that work. If you \
+cannot name any, do not return the pick at all - that is the test.
+- Where you are unsure whether a place has enough beyond the constraint, say so in \
+`diet_fit` and lower `confidence` accordingly.
+
 For each recommendation:
 - `osm_ref` must be copied exactly from the candidate line. A pick whose reference \
 is not in the list is dropped afterward, so a mistyped one costs a slot.
@@ -242,6 +259,20 @@ def build_profile(library: Library, target: Target) -> str:
     the tokens and invites double-counting.
     """
     local_radius_km = target.radius_km * LOCAL_MULTIPLE
+    household = library.household
+
+    preamble: list[str] = []
+    if household.has_constraints:
+        # First in the prompt, because it is the one thing that can disqualify a
+        # pick outright. Everything after it is preference; this is a requirement.
+        preamble = [
+            "# DIETARY REQUIREMENT - a hard constraint on every pick",
+            f"# Someone in the party is {household.describe()}.",
+            "# Every place you suggest must have substantial dishes they can actually "
+            "eat. A restaurant built around what they cannot eat is disqualified "
+            "however good it is. Answer `diet_fit` for every pick.",
+            "",
+        ]
 
     def distance(r: Restaurant) -> float | None:
         if not r.has_location:
@@ -264,7 +295,7 @@ def build_profile(library: Library, target: Target) -> str:
     local.sort(key=lambda pair: -(pair[0].rating or 0))
 
     cities = {r.city for r, _ in globals_ if r.city}
-    sections: list[str] = []
+    sections: list[str] = list(preamble)
 
     if globals_:
         sections.append(
@@ -483,8 +514,22 @@ def _verify(
     seen: set[str] = set()
     off_list_used = 0
     max_km = target.radius_km * 1.5
+    household = library.household
 
     for rec in proposed:
+        # A dietary constraint is the one thing the code can hold the model to
+        # without being able to check the answer itself: we cannot read a menu, but
+        # we can insist the pick comes with a specific dish named, and drop it
+        # otherwise. Evasive answers count as no answer.
+        if household.has_constraints:
+            fit = (rec.diet_fit or "").strip()
+            if len(fit) < 8 or fold(fit) in {"none", "n a", "na", "unknown", "unsure"}:
+                dropped.append(
+                    f"{rec.name} - no dish named for the "
+                    f"{' / '.join(household.diets)} diner"
+                )
+                continue
+
         folded = fold(rec.name)
         candidate = None
         source = "candidate"

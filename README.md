@@ -66,6 +66,43 @@ Whether a place is any *good* comes from your own notes plus whatever the model 
 that specific named venue — which is why `confidence` is often honestly low, and why the
 prompt tells it to say so rather than dress up a guess.
 
+## Dietary requirements are a constraint, not a taste
+
+If someone in the party can't eat certain things, that belongs on the household rather than
+on any restaurant:
+
+```bash
+eats household --diet pescatarian --note "fish and seafood are fine, no meat or poultry"
+eats household                    # show the current requirement
+eats household --clear
+```
+
+This is stored once and applied to every run. It lives here, not per-restaurant, for two
+reasons: it describes who is eating rather than what a place is like, and as a per-restaurant
+field it would carry no information at all — every place you've been already has something
+the pescatarian could eat, which is why you went, so the column would be uniformly true.
+
+A diet also behaves differently from a preference. A low score means "this wasn't good"; a
+diet means "this place is disqualified however good it is." So it enters the prompt first,
+ahead of all the taste material, as a hard constraint.
+
+**Don't expect OpenStreetMap to help here.** Measured across 764 restaurants near 96707:
+`diet:pescetarian` appears on exactly **one**, and only 36 carry any `diet:*` tag at all.
+Their absence means nothing, and the prompt says so explicitly so the model doesn't read a
+missing tag as a negative.
+
+What does the work instead is the model's own knowledge of each menu, made mandatory. Every
+pick has to fill in `diet_fit` naming the specific dishes that work, and a pick that can't is
+dropped in verification — the same enforced-twice discipline used for the candidate list. The
+answer is shown in the CLI and on the page, so the reasoning is auditable rather than assumed.
+
+Cuisine tags give a cheap head start — `steak_house`, `barbecue`, `chicken` and similar get a
+scoring penalty — but only a mild one, since a steakhouse often has a real fish menu and the
+bar is "something substantial to eat", not "no meat on the premises". Tags alone are not
+enough anyway: the clearest failure in practice was a **tonkatsu specialist tagged plain
+`japanese`**, which scored second-highest on the shortlist and no tag-based rule could catch.
+The model dropped it once the constraint was stated.
+
 ## Setup
 
 ```bash

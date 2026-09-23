@@ -50,6 +50,21 @@ CHAIN_NAMES = {
 # about what someone likes.
 _VAGUE_CUISINES = {"regional", "international", "local", "fusion", "american"}
 
+# Cuisines built around meat, which are usually a poor fit for a pescatarian or
+# vegetarian in the party. A penalty rather than an exclusion, because a steakhouse
+# often has a real fish menu and the bar is "something substantial to eat", not "no
+# meat on the premises". These tokens are only ever a hint: the clearest failure case
+# in practice was a tonkatsu specialist tagged plain `japanese`, which no tag-based
+# rule catches. The prompt and the required diet_fit answer do the real work.
+_MEAT_CENTRIC = {
+    "steak_house", "barbecue", "bbq", "yakiniku", "korean_bbq", "chicken",
+    "wings", "burger", "meat", "kebab", "grill", "pork", "beef", "ribs",
+    "fried_chicken", "sausage", "steak",
+}
+
+# Diets for which _MEAT_CENTRIC is a problem at all.
+_MEAT_AVERSE = {"pescatarian", "pescetarian", "vegetarian", "vegan", "plant-based"}
+
 
 def _is_chain(candidate: Candidate) -> bool:
     return bool(candidate.brand) or fold(candidate.name) in CHAIN_NAMES
@@ -135,6 +150,26 @@ def _taste(library: Library) -> tuple[Counter, set[str]]:
 def _affinity(candidate: Candidate, weights: Counter) -> float:
     raw = sum(weights.get(c.lower(), 0.0) for c in candidate.cuisine)
     return max(-2.0, min(3.0, raw * 0.5))
+
+
+def _diet_penalty(candidate: Candidate, meat_averse: bool) -> float:
+    """Push meat-built venues down the shortlist when someone can't eat meat.
+
+    Modest and deliberately not a hard exclusion: many such places do have a fish
+    menu, and dropping them outright would also drop the good ones. A positive nudge
+    goes the other way for venues whose OSM tags confirm vegetarian or vegan food,
+    though that only helps for the ~3% that carry the tag.
+    """
+    if not meat_averse:
+        return 0.0
+    penalty = 0.0
+    if any(c.lower() in _MEAT_CENTRIC for c in candidate.cuisine):
+        penalty -= 1.5
+    if any(d in ("vegetarian", "vegan", "pescetarian") for d in candidate.diet):
+        penalty += 1.0
+    if any(c.lower() in ("seafood", "fish", "sushi") for c in candidate.cuisine):
+        penalty += 0.5
+    return penalty
 
 
 def _owned(library: Library) -> tuple[set[str], list[Restaurant]]:
@@ -303,6 +338,9 @@ def retrieve(
         radius = min(int(radius * 1.5), MAX_RADIUS_M)
 
     radius_km = max(radius / 1000.0, 0.1)
+    meat_averse = any(
+        fold(d) in _MEAT_AVERSE for d in library.household.diets
+    )
     for candidate in pool:
         # Distance is a weak tiebreak by design, capped at -0.3 against a richness
         # range of roughly 0-8. A meaningful distance penalty would quietly re-rank
@@ -310,7 +348,10 @@ def retrieve(
         # whole reason for using a wide radius.
         distance_penalty = -0.3 * min(candidate.distance_km / radius_km, 1.0)
         candidate.score = (
-            _richness(candidate) + _affinity(candidate, weights) + distance_penalty
+            _richness(candidate)
+            + _affinity(candidate, weights)
+            + _diet_penalty(candidate, meat_averse)
+            + distance_penalty
         )
 
     return _select(pool, limit, known_cuisines, radius_km), radius, len(pool)

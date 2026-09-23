@@ -1,4 +1,10 @@
 {
+  "household": {
+    "diets": [
+      "pescatarian"
+    ],
+    "notes": "one of us; fish and seafood are fine, no meat or poultry"
+  },
   "restaurants": [
     {
       "address": "987 Queen St Apt 100",

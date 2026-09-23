@@ -164,7 +164,36 @@ class Restaurant(BaseModel):
         return f"np:{fold(self.name)}|{fold(self.city or '')}|{fold(self.state or '')}"
 
 
+class Household(BaseModel):
+    """Standing requirements that apply to every recommendation, not to one place.
+
+    Diets live here rather than on each restaurant because they are a property of
+    who is eating, and they are a *constraint* rather than a taste: a place that
+    cannot feed someone in the party is disqualified however good it is, which is a
+    different kind of statement from a low score.
+
+    Recording it per-restaurant would also carry no signal. Every place already
+    visited has something a pescatarian can eat - that is why it got visited - so
+    the field would be uniformly true and would discriminate nothing.
+    """
+
+    diets: list[str] = Field(default_factory=list)
+    """e.g. ["pescatarian"]. Free text, since real diets don't fit an enum."""
+
+    notes: str | None = None
+    """Nuance a label can't hold - how strict, who it applies to, what the bar is."""
+
+    @property
+    def has_constraints(self) -> bool:
+        return bool(self.diets)
+
+    def describe(self) -> str:
+        label = " and ".join(self.diets)
+        return f"{label}{f' ({self.notes})' if self.notes else ''}"
+
+
 class Library(BaseModel):
+    household: Household = Field(default_factory=Household)
     restaurants: list[Restaurant] = Field(default_factory=list)
 
 
@@ -235,6 +264,14 @@ class Recommendation(BaseModel):
     dish: str | None = Field(
         default=None,
         description="One specific thing worth ordering, only if you actually know the place",
+    )
+    diet_fit: str | None = Field(
+        default=None,
+        description=(
+            "Required when the household has a dietary constraint: name the actual "
+            "dishes someone on that diet could order here. Leave null only if there "
+            "is no constraint. A place you cannot answer this for is disqualified."
+        ),
     )
     confidence: float = Field(ge=0.0, le=1.0)
 

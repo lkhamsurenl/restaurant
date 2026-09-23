@@ -108,6 +108,25 @@ class Restaurant(BaseModel):
     tags: list[str] = Field(default_factory=list)
     permanently_closed: bool = False
 
+    boycott: bool = False
+    """Won't go back for reasons that say nothing about the food.
+
+    Labor practices, ownership, how staff are treated - objections that are about
+    the business rather than the meal. This needs its own flag because a low rating
+    is a statement about the cooking, and the recommender reads it that way: it
+    infers what to avoid from the cuisines and attributes of poorly-rated places.
+
+    Sushi Bay is the case that forced this. Rating it 2 for wage theft, with food 5
+    and kind staff, would have pushed the `japanese` cuisine weight to -1.5 and
+    quietly suppressed every good Japanese restaurant in the candidate pool, while
+    also diluting the signal that noise is what actually ruins a meal here.
+
+    So a boycotted place is excluded from taste inference entirely - cuisine
+    weights, attribute averages, the dealbreaker calculation - and listed for the
+    model under its own heading as somewhere never to suggest. It still shows in the
+    library, because remembering why is the whole point.
+    """
+
     @property
     def is_positive(self) -> bool:
         """Worth extending the pattern of."""

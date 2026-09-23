@@ -201,6 +201,7 @@ TEMPLATE = Template(
         <a class="name" href="{{ r.osm_url }}">{{ r.name }}</a>
         {% else %}<span class="name">{{ r.name }}</span>{% endif %}
         {% if r.status.value == 'want-to-try' %}<span class="pill">want to try</span>{% endif %}
+        {% if r.boycott %}<span class="pill off">won't return</span>{% endif %}
         <div class="meta">
           {% if r.rating %}<span class="stars">{{ r.rating }}/5</span> · {% endif %}
           {% if r.price %}{{ '$' * r.price }} · {% endif %}

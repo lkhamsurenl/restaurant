@@ -114,6 +114,10 @@ def _taste(library: Library) -> tuple[Counter, set[str]]:
     for r in library.restaurants:
         if r.status is Status.NOT_INTERESTED or r.rating is None:
             continue
+        # A boycott is about the business, not the cooking. Letting it feed the
+        # cuisine weights would read "never going back" as "this cuisine is bad".
+        if r.boycott:
+            continue
         for token in r.cuisine:
             token = token.lower()
             if token in _VAGUE_CUISINES:

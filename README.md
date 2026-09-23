@@ -131,11 +131,31 @@ eats skip "That Closed Bistro" --closed    # also stops OSM from re-offering it
 Skipping something from the last `recommend` run reuses metadata already in
 `recommendations.json`, so it costs no lookup.
 
-Two distinctions worth keeping straight:
+Rule a place out over how the business behaves rather than how it cooks:
+
+```bash
+eats add "Somewhere" --lat 21.34 --lon -158.08 --rating 2 --food 5 --boycott \
+  --note "food is good and staff are kind, but the owners steal wages"
+```
+
+`--boycott` exists because a low rating is read as a statement about the *cooking*. The
+recommender infers what to avoid from the cuisines and attributes of poorly-rated places, so
+rating a good sushi restaurant 2 over labor practices would push the `japanese` cuisine
+weight negative and quietly suppress every decent Japanese restaurant in the candidate pool
+— while also diluting the real signal about what ruins a meal for you.
+
+A boycotted place is therefore kept out of taste inference entirely (cuisine weights,
+attribute averages, the dealbreaker calculation) and handed to the model under its own
+heading that says, in as many words, never suggest this and infer nothing from it. It still
+appears in the library and on the page, flagged *won't return*, because remembering why is
+the whole point.
+
+Three distinctions worth keeping straight:
 
 | | Meaning | Effect on recommendations |
 |---|---|---|
-| `--rating 1-2` | You ate there and it wasn't good | Avoid-list: the model infers what was wrong |
+| `--rating 1-2` | You ate there and the food wasn't good | Avoid-list: the model infers what was wrong |
+| `--boycott` | You won't return, for reasons unrelated to the food | Never suggested; teaches nothing about taste |
 | `eats skip` | Never went, not interested | Suppressed, teaches nothing about taste |
 
 See what you have:

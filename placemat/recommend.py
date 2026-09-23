@@ -130,6 +130,7 @@ def attribute_profile(library: Library) -> list[str]:
         for r in library.restaurants
         if r.rating is not None
         and r.status is not Status.NOT_INTERESTED
+        and not r.boycott  # its low rating is about the business, not the meal
         and r.ratings.any_set
     ]
     if len(rated) < 3:
@@ -250,7 +251,9 @@ def build_profile(library: Library, target: Target) -> str:
     rated = [
         r
         for r in library.restaurants
-        if r.rating is not None and r.status is not Status.NOT_INTERESTED
+        if r.rating is not None
+        and r.status is not Status.NOT_INTERESTED
+        and not r.boycott
     ]
     local, globals_ = [], []
     for r in rated:
@@ -303,6 +306,23 @@ def build_profile(library: Library, target: Target) -> str:
             f"# LOCAL HISTORY - none. They have never eaten near {target.label}. "
             "Lean entirely on GLOBAL TASTE and on what you know about these "
             "specific venues.",
+        ]
+
+    boycotted = [r for r in library.restaurants if r.boycott]
+    if boycotted:
+        sections += [
+            "",
+            f"# WILL NOT RETURN, ON PRINCIPLE - never suggest these ({len(boycotted)} places)",
+            "# These are ruled out over how the business behaves, not over the food - "
+            "in some cases the cooking was very good. So do not infer anything about "
+            "their taste from this list: do not avoid these cuisines, these "
+            "neighbourhoods, or places that resemble them. Just never suggest the "
+            "place itself.",
+            *(
+                f"- {r.name} — {r.place_label}"
+                + (f" ({r.notes})" if r.notes else "")
+                for r in boycotted
+            ),
         ]
 
     skipped = [r for r in library.restaurants if r.status is Status.NOT_INTERESTED]

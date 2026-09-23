@@ -157,6 +157,9 @@ def _add_by_address(restaurant: Restaurant, name: str, address: str, country: st
 @click.option("--status", type=click.Choice([s.value for s in Status]), default="visited")
 @click.option("--date", "date_visited", help="When you went. Stored as given.")
 @click.option("--tag", "tags", multiple=True, help="Freeform tag. Repeatable.")
+@click.option("--boycott", is_flag=True,
+              help="Won't return over how the business behaves, not the food. "
+                   "Kept out of taste inference entirely.")
 @click.option("--lat", type=float, help="Set coordinates by hand; skips the OSM lookup.")
 @click.option("--lon", type=float, help="Set coordinates by hand; skips the OSM lookup.")
 @click.option("--radius-km", default=12.0, help="How far around the city to search.")
@@ -164,8 +167,8 @@ def _add_by_address(restaurant: Restaurant, name: str, address: str, country: st
 @click.option("--yes", "-y", is_flag=True, help="Accept the top match without confirming.")
 @click.option("--country", default="us", help="Country filter for geocoding.")
 def add(name, address, city, zipcode, state, rating, note, food, vibe, quiet, service,
-        value, dish, price, status, date_visited, tags, lat, lon, radius_km, no_lookup,
-        yes, country) -> None:
+        value, dish, price, status, date_visited, tags, boycott, lat, lon, radius_km,
+        no_lookup, yes, country) -> None:
     """Add a restaurant to your library, enriched from OpenStreetMap."""
     if (lat is None) != (lon is None):
         raise click.ClickException("Pass both --lat and --lon, or neither.")
@@ -263,6 +266,7 @@ def add(name, address, city, zipcode, state, rating, note, food, vibe, quiet, se
     restaurant.price = price
     restaurant.date_visited = date_visited
     restaurant.tags = list(tags)
+    restaurant.boycott = boycott
 
     library = store.load()
     is_new = store.upsert(library, restaurant)
@@ -278,6 +282,11 @@ def add(name, address, city, zipcode, state, rating, note, food, vibe, quiet, se
     click.echo(f"{verb}: {restaurant.name} — {restaurant.place_label}{label}")
     if restaurant.ratings.any_set:
         click.echo(f"  {restaurant.ratings.summary()}")
+    if restaurant.boycott:
+        click.echo(
+            "  Marked will-not-return on principle: never recommended, and kept out "
+            "of taste inference so it says nothing about the cuisine."
+        )
 
 
 @main.command()

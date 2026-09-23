@@ -8,7 +8,7 @@ from pathlib import Path
 from jinja2 import Template
 
 from .geo import osm_element_url, osm_point_url, project, scale_bar_km
-from .models import Library, LocationSource, Recommendations, Restaurant, Status
+from .models import Library, LocationSource, Recommendations, Restaurant, Status, fold
 
 # GitHub Pages only serves from the repo root or /docs when deploying from a
 # branch - an arbitrary folder like site/ is not selectable.
@@ -294,8 +294,23 @@ def render(
     # long run is useful for choosing from, but twenty-odd cards ahead of the
     # library would bury it.
     picks: list[_View] = []
+    stale = 0
     if recs:
-        ranked = sorted(recs.recommendations, key=lambda r: -r.confidence)
+        # A recommendation goes stale the moment you act on it. Adding a suggested
+        # place to the library leaves it sitting in recommendations.json, and
+        # publishing "you should try this" for somewhere already rated is plainly
+        # wrong - so drop those here rather than making a fresh API call the price of
+        # an accurate page.
+        known = {r.key for r in library.restaurants}
+        known_names = {fold(r.name) for r in library.restaurants}
+        fresh = [
+            r
+            for r in recs.recommendations
+            if fold(r.name) not in known_names
+            and f"osm:{r.osm_type}/{r.osm_id}" not in known
+        ]
+        stale = len(recs.recommendations) - len(fresh)
+        ranked = sorted(fresh, key=lambda r: -r.confidence)
         picks = [_View(r) for r in (ranked[:limit] if limit else ranked)]
 
     scores = [r.rating for r in shown if r.rating]
@@ -308,7 +323,7 @@ def render(
         avg=f"{sum(scores) / len(scores):.1f}" if scores else None,
         recs=recs,
         picks=picks,
-        withheld=(len(recs.recommendations) - len(picks)) if recs else 0,
+        withheld=(len(recs.recommendations) - stale - len(picks)) if recs else 0,
         household=library.household,
         diet_label=(
             " / ".join(library.household.diets)

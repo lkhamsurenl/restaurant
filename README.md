@@ -165,8 +165,24 @@ eats skip "Loud Brunch Place"
 eats skip "That Closed Bistro" --closed    # also stops OSM from re-offering it
 ```
 
-Skipping something from the last `recommend` run reuses metadata already in
-`recommendations.json`, so it costs no lookup.
+### Acting on a recommendation
+
+This is the loop the tool is built around: run `recommend`, go somewhere, then record it.
+Both `add` and `skip` recognise a name from the last run and reuse the metadata already in
+`recommendations.json`, so neither costs a lookup — no `--address`, no coordinates, nothing:
+
+```bash
+eats add "Olay's Thai Lao Cuisine" --rating 5 --food 5 --service 5 \
+  --dish "pad thai" --note "been here many times, very delicious"   # ~0.4s, no network
+```
+
+It inherits the OSM id, coordinates, address, website and cuisine tags, because the place was
+already resolved to a real venue in order to be suggested at all.
+
+Adding a suggested place also makes that suggestion stale, and `build` drops any
+recommendation now in your library rather than publishing "you should try this" for somewhere
+you've already rated. So the page stays honest between runs — you only need to re-run
+`recommend` when you want *new* ideas, not to correct the old ones.
 
 Rule a place out over how the business behaves rather than how it cooks:
 

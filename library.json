@@ -103,6 +103,37 @@
       "zip": "96813"
     },
     {
+      "address": "66 North Hotel Street",
+      "boycott": false,
+      "city": "Honolulu",
+      "cuisine": [
+        "thai",
+        "lao"
+      ],
+      "dishes": [
+        "pad thai",
+        "tom yum",
+        "curries"
+      ],
+      "lat": 21.3120242,
+      "location_source": "osm-tags",
+      "lon": -157.8625832,
+      "name": "Olay's Thai Lao Cuisine",
+      "notes": "Been here many times. Paid parking nearby. Very delicious food - we love their pad thai, tom yum, and curries. Great service as well.",
+      "osm_id": 12369314425,
+      "osm_type": "node",
+      "permanently_closed": false,
+      "rating": 5,
+      "ratings": {
+        "food": 5,
+        "service": 5
+      },
+      "state": "Hawaii",
+      "status": "visited",
+      "tags": [],
+      "website": "https://olaysthaihawaii.com"
+    },
+    {
       "address": "1000 Auahi St Unit 220",
       "boycott": false,
       "city": "Honolulu",

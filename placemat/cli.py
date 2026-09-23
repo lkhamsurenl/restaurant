@@ -180,7 +180,24 @@ def add(name, address, city, zipcode, state, rating, note, food, vibe, quiet, se
         ratings=Ratings(food=food, vibe=vibe, quiet=quiet, service=service, value=value),
     )
 
-    if address and lat is None and not no_lookup:
+    suggested = None
+    if not (address or no_lookup or lat is not None):
+        # Closing the natural loop: you run `recommend`, you go, you add it. The place
+        # was already resolved to a real OSM venue to be suggested at all, so
+        # re-deriving its coordinates would cost a lookup to learn what is sitting in
+        # recommendations.json. `skip` has always done this; `add` is the more common
+        # path and was missing it.
+        suggested = _from_recommendations(name)
+
+    if suggested is not None:
+        for field in (
+            "name", "osm_type", "osm_id", "lat", "lon", "address", "city", "state",
+            "website", "cuisine",
+        ):
+            setattr(restaurant, field, getattr(suggested, field))
+        click.echo(f"Reusing details from the last recommendation - no lookup needed.")
+        _fill_labels(restaurant, state=state)
+    elif address and lat is None and not no_lookup:
         _add_by_address(restaurant, name, address, country)
     elif no_lookup:
         restaurant.city, restaurant.state, restaurant.zip = city, state, zipcode

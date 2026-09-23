@@ -136,6 +136,11 @@ TEMPLATE = Template(
   .chips span { display: inline-block; font-size: .75rem; padding: .1rem .4rem;
                 border: 1px solid var(--line); border-radius: 999px;
                 margin: .2rem .2rem 0 0; color: var(--muted); }
+  .scores { display: flex; flex-wrap: wrap; gap: .1rem .9rem; margin-top: .6rem;
+            font-size: .78rem; color: var(--muted); }
+  .scores div { display: flex; align-items: center; gap: .3rem; }
+  .scores i { font-style: normal; letter-spacing: .06em; color: var(--accent); }
+  .scores i .off { color: var(--line); }
   .stats { display: flex; flex-wrap: wrap; gap: 1.5rem; margin: 0 0 1rem;
            color: var(--muted); font-size: .9rem; }
   .stats b { color: var(--fg); font-size: 1.3rem; display: block;
@@ -203,6 +208,14 @@ TEMPLATE = Template(
         {% if r.cuisine %}
         <div class="chips">{% for c in r.cuisine[:4] %}<span>{{ c }}</span>{% endfor %}</div>
         {% endif %}
+        {% if r.score_bars %}
+        <div class="scores">
+          {% for label, filled in r.score_bars %}
+          <div><span>{{ label }}</span><i>{{ '●' * filled }}<span class="off">{{
+            '●' * (5 - filled) }}</span></i></div>
+          {% endfor %}
+        </div>
+        {% endif %}
         {% if r.notes %}<div class="note">{{ r.notes }}</div>{% endif %}
         {% if r.dishes %}<div class="dishes">{{ r.dishes|join(', ') }}</div>{% endif %}
       </div>
@@ -242,6 +255,9 @@ class _Shown(_View):
         if not self.osm_url and restaurant.has_location:
             self.osm_url = osm_point_url(restaurant.lat, restaurant.lon)  # type: ignore[arg-type]
         self.approx = restaurant.location_source is LocationSource.REVERSE
+        # Only the attributes actually scored. An unscored one is left out entirely
+        # rather than drawn empty, since a blank is not a zero.
+        self.score_bars = list(restaurant.ratings.scored().items())
 
 
 def render(

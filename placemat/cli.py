@@ -13,6 +13,7 @@ from . import nominatim, osm, overpass, store
 from .geo import haversine_km
 from .models import (
     LocationSource,
+    Ratings,
     Recommendations,
     Restaurant,
     Status,
@@ -144,8 +145,13 @@ def _add_by_address(restaurant: Restaurant, name: str, address: str, country: st
 @click.option("--zip", "zipcode", help="Where to look, as a US zip. Locates the search only.")
 @click.option("--state", help="Override the stored state label.")
 @click.option("--rating", "-r", type=click.IntRange(1, 5),
-              help="How much you liked it, 1-5. The main signal.")
-@click.option("--note", "-n", help="Why it landed (or didn't). The most useful field.")
+              help="How much you liked it overall, 1-5. The main signal.")
+@click.option("--note", "-n", help="Why it landed (or didn't). Still the most useful field.")
+@click.option("--food", type=click.IntRange(1, 5), help="Attribute score, 1-5.")
+@click.option("--vibe", type=click.IntRange(1, 5), help="Room, decor, atmosphere. 1-5.")
+@click.option("--quiet", type=click.IntRange(1, 5), help="5 = pleasantly quiet. 1-5.")
+@click.option("--service", type=click.IntRange(1, 5), help="Staff and the wait. 1-5.")
+@click.option("--value", type=click.IntRange(1, 5), help="What you got for the price. 1-5.")
 @click.option("--dish", "-d", multiple=True, help="Something worth ordering. Repeatable.")
 @click.option("--price", type=click.IntRange(1, 4), help="Your read, 1-4 ($ to $$$$).")
 @click.option("--status", type=click.Choice([s.value for s in Status]), default="visited")
@@ -157,13 +163,18 @@ def _add_by_address(restaurant: Restaurant, name: str, address: str, country: st
 @click.option("--no-lookup", is_flag=True, help="Record exactly what you typed; no network.")
 @click.option("--yes", "-y", is_flag=True, help="Accept the top match without confirming.")
 @click.option("--country", default="us", help="Country filter for geocoding.")
-def add(name, address, city, zipcode, state, rating, note, dish, price, status,
-        date_visited, tags, lat, lon, radius_km, no_lookup, yes, country) -> None:
+def add(name, address, city, zipcode, state, rating, note, food, vibe, quiet, service,
+        value, dish, price, status, date_visited, tags, lat, lon, radius_km, no_lookup,
+        yes, country) -> None:
     """Add a restaurant to your library, enriched from OpenStreetMap."""
     if (lat is None) != (lon is None):
         raise click.ClickException("Pass both --lat and --lon, or neither.")
 
-    restaurant = Restaurant(name=name, status=Status(status))
+    restaurant = Restaurant(
+        name=name,
+        status=Status(status),
+        ratings=Ratings(food=food, vibe=vibe, quiet=quiet, service=service, value=value),
+    )
 
     if address and lat is None and not no_lookup:
         _add_by_address(restaurant, name, address, country)
@@ -265,6 +276,8 @@ def add(name, address, city, zipcode, state, rating, note, dish, price, status,
     label = f"  [{', '.join(bits)}]" if bits else ""
     verb = "Added" if is_new else "Updated"
     click.echo(f"{verb}: {restaurant.name} — {restaurant.place_label}{label}")
+    if restaurant.ratings.any_set:
+        click.echo(f"  {restaurant.ratings.summary()}")
 
 
 @main.command()
@@ -417,8 +430,9 @@ def list_places(min_rating, skipped, want, city, cuisine, near, radius_km, count
         dist = ""
         if origin and r.has_location:
             dist = f"  ({haversine_km(*origin, r.lat, r.lon):.1f}km)"
+        scores = f"\n        {r.ratings.summary()}" if r.ratings.any_set else ""
         note = f"\n        {r.notes}" if r.notes else ""
-        return f"{stars}{price}  {r.name}{cuisines}{approx}{dist}{note}"
+        return f"{stars}{price}  {r.name}{cuisines}{approx}{dist}{scores}{note}"
 
     if origin:
         places.sort(key=lambda r: haversine_km(*origin, r.lat, r.lon))

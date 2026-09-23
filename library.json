@@ -12,6 +12,10 @@
       "notes": "Food options were good, interior was kinda dark. Authentic Italian food.",
       "permanently_closed": false,
       "rating": 4,
+      "ratings": {
+        "food": 4,
+        "vibe": 3
+      },
       "state": "Hawaii",
       "status": "visited",
       "tags": [],
@@ -34,6 +38,11 @@
       "osm_type": "node",
       "permanently_closed": false,
       "rating": 5,
+      "ratings": {
+        "food": 5,
+        "service": 5,
+        "vibe": 4
+      },
       "state": "Hawaii",
       "status": "visited",
       "tags": [],
@@ -51,6 +60,10 @@
       "notes": "Interior is a little outdated. Sushi is great, they have a tablet you can use to order.",
       "permanently_closed": false,
       "rating": 4,
+      "ratings": {
+        "food": 5,
+        "vibe": 2
+      },
       "state": "Hawaii",
       "status": "visited",
       "tags": [],
@@ -71,6 +84,9 @@
       "osm_type": "node",
       "permanently_closed": false,
       "rating": 4,
+      "ratings": {
+        "food": 4
+      },
       "state": "Hawaii",
       "status": "visited",
       "tags": [],
@@ -88,6 +104,11 @@
       "notes": "Very good food, there is never a line. Lunch specials are good deals as well.",
       "permanently_closed": false,
       "rating": 5,
+      "ratings": {
+        "food": 5,
+        "service": 5,
+        "value": 5
+      },
       "state": "Hawaii",
       "status": "visited",
       "tags": [],
@@ -105,6 +126,10 @@
       "notes": "Too noisy, food was ok, nothing amazing though.",
       "permanently_closed": false,
       "rating": 3,
+      "ratings": {
+        "food": 3,
+        "quiet": 1
+      },
       "state": "Hawaii",
       "status": "visited",
       "tags": [],
@@ -128,6 +153,10 @@
       "osm_type": "node",
       "permanently_closed": false,
       "rating": 5,
+      "ratings": {
+        "food": 5,
+        "vibe": 5
+      },
       "state": "Hawaii",
       "status": "visited",
       "tags": [],
@@ -145,6 +174,10 @@
       "notes": "Great mocktails, happy hour menu was great. Terrace seating is a plus. Live music and beautiful interior.",
       "permanently_closed": false,
       "rating": 5,
+      "ratings": {
+        "value": 5,
+        "vibe": 5
+      },
       "state": "Hawaii",
       "status": "visited",
       "tags": [],
@@ -165,6 +198,10 @@
       "osm_type": "node",
       "permanently_closed": false,
       "rating": 3,
+      "ratings": {
+        "food": 4,
+        "quiet": 1
+      },
       "state": "Hawaii",
       "status": "visited",
       "tags": [],
@@ -182,6 +219,11 @@
       "notes": "Very good food, dessert was great, presentation was good. Interior was outdated. High quality, bit on the pricier side, but would recommend.",
       "permanently_closed": false,
       "rating": 4,
+      "ratings": {
+        "food": 5,
+        "value": 3,
+        "vibe": 2
+      },
       "state": "Hawaii",
       "status": "visited",
       "tags": [],

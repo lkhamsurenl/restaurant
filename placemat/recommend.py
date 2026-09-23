@@ -25,6 +25,7 @@ from .geo import haversine_km
 from .models import (
     Candidate,
     Library,
+    Ratings,
     Recommendation,
     RecommendationList,
     Recommendations,
@@ -62,6 +63,15 @@ wasted slot too.
 - Ratings are 1-5. Treat 4-5 as the taste to extend, 3 as lukewarm - note what \
 was missing rather than chasing more of it - and 1-2 as a hard avoid-list, just \
 as informative as the high scores. Weight a 5 more heavily than a 4.
+- Some places carry per-attribute `scores` (food, vibe, quiet, service, value), \
+all 1-5 and all higher-is-better, so `quiet 1` means unpleasantly loud. Read them \
+against the HOW THEY SCORE averages rather than absolutely: a 4 on an attribute \
+they average 3.0 on is warm praise. A blank is not a zero, it means they did not \
+record a view.
+- WHAT SINKS A PLACE FOR THEM, when present, is the most actionable thing you are \
+given. The top entry there is close to a dealbreaker, and a candidate you suspect \
+fails on it is a bad pick however well the cuisine matches. Say in `avoids` how \
+your pick handles that specific attribute.
 - LOCAL HISTORY is the sharper instrument. A 5 they gave twenty minutes away \
 tells you more about what is good *here* than a 5 from another city. But do not \
 confine yourself to the local pattern - GLOBAL TASTE is what generalizes.
@@ -100,6 +110,106 @@ target area. Stay within the off-list budget given in the request, and use it on
 when you are confident the place exists and is still open."""
 
 
+def attribute_profile(library: Library) -> list[str]:
+    """Describe how this eater uses the attribute scores, and what sinks a place.
+
+    This is what the structured scores buy that a note cannot. Two things fall out
+    of them that the model would otherwise have to guess at:
+
+    - Calibration. Knowing someone marks vibe at 3.0 and food at 4.6 on average
+      says a 4 for vibe from them is warm praise, not a shrug.
+    - The dealbreaker. Comparing each attribute's average on their poorly-rated
+      places against its average on the good ones surfaces the dimension that
+      actually sinks a meal for them, rather than the one they write about most.
+
+    Counts are always printed alongside, because on a library this small a gap of
+    two points can rest on two places, and the model should weigh it accordingly.
+    """
+    rated = [
+        r
+        for r in library.restaurants
+        if r.rating is not None
+        and r.status is not Status.NOT_INTERESTED
+        and r.ratings.any_set
+    ]
+    if len(rated) < 3:
+        return []
+
+    lines: list[str] = []
+    averages: dict[str, tuple[float, int]] = {}
+    for attribute in Ratings.FIELDS:
+        scores = [
+            getattr(r.ratings, attribute)
+            for r in rated
+            if getattr(r.ratings, attribute) is not None
+        ]
+        if scores:
+            averages[attribute] = (sum(scores) / len(scores), len(scores))
+
+    if not averages:
+        return []
+
+    lines.append(
+        "# HOW THEY SCORE - average per attribute, with how many places each rests on."
+    )
+    lines.append(
+        "# Read these as calibration: an attribute they mark low across the board is "
+        "a high bar, not a complaint about any one place."
+    )
+    for attribute, (mean, count) in sorted(averages.items(), key=lambda kv: -kv[1][0]):
+        lines.append(f"- {attribute}: {mean:.1f} average (from {count} places)")
+
+    # Which attribute separates their bad experiences from their good ones.
+    good = [r for r in rated if r.rating >= 4]
+    poor = [r for r in rated if r.rating <= 3]
+    gaps: list[tuple[float, str, str]] = []
+    for attribute in Ratings.FIELDS:
+        poor_scores = [
+            getattr(r.ratings, attribute) for r in poor
+            if getattr(r.ratings, attribute) is not None
+        ]
+        good_scores = [
+            getattr(r.ratings, attribute) for r in good
+            if getattr(r.ratings, attribute) is not None
+        ]
+        if not poor_scores:
+            continue
+        poor_mean = sum(poor_scores) / len(poor_scores)
+        if good_scores:
+            good_mean = sum(good_scores) / len(good_scores)
+            gap = good_mean - poor_mean
+            detail = (
+                f"{poor_mean:.1f} on the {len(poor_scores)} place(s) they rated 3 or "
+                f"below, against {good_mean:.1f} on the {len(good_scores)} they rated 4+"
+            )
+        elif poor_mean <= 2.5:
+            # Recorded only where things went wrong, which is itself informative.
+            gap = 5.0 - poor_mean
+            detail = (
+                f"{poor_mean:.1f} on the {len(poor_scores)} place(s) they rated 3 or "
+                f"below, and not scored anywhere they rated 4+ - they appear to note "
+                f"it only when it is a problem"
+            )
+        else:
+            continue
+        if gap >= 1.0:
+            gaps.append((gap, attribute, detail))
+
+    if gaps:
+        gaps.sort(reverse=True)
+        lines.append("")
+        lines.append("# WHAT SINKS A PLACE FOR THEM, strongest signal first")
+        lines.append(
+            "# Treat the top entry as close to a dealbreaker: it is the attribute that "
+            "best separates the meals they liked from the ones they didn't. Weight it "
+            "above cuisine when choosing."
+        )
+        for _, attribute, detail in gaps:
+            lines.append(f"- {attribute}: {detail}")
+
+    return lines
+
+
 def _format(restaurant: Restaurant, distance_km: float | None = None) -> str:
     parts = [f"- {restaurant.name}"]
     if restaurant.place_label != "location unknown":
@@ -114,6 +224,8 @@ def _format(restaurant: Restaurant, distance_km: float | None = None) -> str:
         parts.append(f"({', '.join(restaurant.cuisine[:3])})")
 
     line = " ".join(parts)
+    if restaurant.ratings.any_set:
+        line += f"\n    scores: {restaurant.ratings.summary()}"
     if restaurant.dishes:
         line += f"\n    dishes: {', '.join(restaurant.dishes)}"
     if restaurant.notes:
@@ -206,6 +318,10 @@ def build_profile(library: Library, target: Target) -> str:
                 for r in skipped
             ),
         ]
+
+    attributes = attribute_profile(library)
+    if attributes:
+        sections += ["", *attributes]
 
     want = [r for r in library.restaurants if r.status is Status.WANT_TO_TRY]
     if want:

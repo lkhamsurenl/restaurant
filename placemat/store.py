@@ -57,6 +57,15 @@ def upsert(library: Library, restaurant: Restaurant) -> bool:
     # Merge: keep fields already set by hand unless the incoming record has a value.
     incoming = restaurant.model_dump(exclude_none=True, exclude_defaults=True)
     for field, value in incoming.items():
+        if field == "ratings":
+            # Merge attribute scores one at a time. Assigning the whole nested
+            # object would drop every score the incoming record happens not to
+            # set, so `eats add "X" --food 5` would silently erase an existing
+            # vibe score.
+            for attribute, score in value.items():
+                if score is not None:
+                    setattr(existing.ratings, attribute, score)
+            continue
         setattr(existing, field, value)
     return False
 

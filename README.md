@@ -18,6 +18,35 @@ recommendation possible.
 Knowing what didn't land matters just as much. Places rated 1-2 are sent to the model as an
 explicit avoid-list, and each recommendation has to name which trait it steers clear of.
 
+## Notes and scores do different jobs
+
+Each place carries an overall `rating`, a free-text `note`, and optional per-attribute
+scores: **food, vibe, quiet, service, value**. All five run 1-5 and all are
+higher-is-better — which is why the noise dimension is stored as `quiet`, where 1 means
+unpleasantly loud. Mixed directions would make averaging meaningless, and averaging is the
+whole point.
+
+They are not redundant, and neither replaces the other:
+
+- **Scores make comparison possible.** With them, the prompt can state *calibration* — if
+  you average 3.5 on vibe and 4.4 on food, a vibe 4 from you is warm praise, not a shrug.
+  More usefully, comparing each attribute's average on your poorly-rated places against
+  your good ones surfaces **what actually sinks a meal for you**, which is not necessarily
+  the thing you write about most.
+- **The note keeps what no schema anticipates.** "Dog friendly", "they have a tablet you
+  can use to order", "never a line", "authentic Italian" — a fixed set of attributes would
+  have discarded all of it, and those specifics are what let a recommendation cite
+  something concrete instead of praising a restaurant in general.
+
+The attribute set is deliberately small. It was chosen from the dimensions that recurred
+three or more times in real notes, because a wider schema sits mostly empty and **a sparse
+score is worse than no score**: a missing `service` value reads like a judgment that was
+made and came out blank, when in fact none was ever formed. Add scores where you have a
+view and leave the rest alone — a blank is not a zero anywhere in the code.
+
+Every score is optional, so nothing forces you to fill in five numbers per meal. In
+practice one or two per place, plus the sentence, is plenty.
+
 ## Why the model doesn't pick from memory
 
 This is the one real difference from a book recommender, and it shapes everything.
@@ -57,17 +86,24 @@ Add places you've eaten. The rating is the main signal, and `--note` is the most
 field you can fill in:
 
 ```bash
-eats add "Zuni Cafe" --city "San Francisco, CA" --rating 5 \
-  --note "the wood oven does all the work; noisy in a good way" \
-  --dish "roast chicken for two"
+eats add "Onkee Korean Grill House" --address "1000 Auahi St, Honolulu, HI 96814" \
+  --rating 5 --food 5 --service 5 --value 5 \
+  --note "very good food, there is never a line; lunch specials are good deals"
 
-eats add "Monkeypod Kitchen" --zip 96707 --rating 4 \
-  --note "the pie is the point; too loud at dinner"
+eats add "Monkeypod Kitchen" --address "92-1048 Olani St, Kapolei, HI 96707" \
+  --rating 3 --food 4 --quiet 1 \
+  --note "food was good, music was too loud"
 ```
 
-Ratings are 1-5; 4-5 is the taste to extend, 1-2 the avoid-list. `--city` or `--zip` tells
-it where to look — either works, they're only used to locate the search. Use `-y` to accept
-the top match without confirming.
+**`--address` is the fast path.** A street address is one indexed geocode taking about a
+second, where searching by venue name is an unindexed scan of every venue in the radius and
+can take a minute — newer or smaller restaurants are frequently missing from OpenStreetMap
+entirely while their address resolves fine. `--city` or `--zip` still work when you don't
+have the address; either one locates the search only.
+
+Ratings are 1-5; 4-5 is the taste to extend, 1-2 the avoid-list. Attribute scores
+(`--food`, `--vibe`, `--quiet`, `--service`, `--value`) are all optional — fill in the ones
+you have a view on. Use `-y` to accept the top match without confirming.
 
 **Places are identified by city and state, not zip.** Many venues have no postcode in
 OpenStreetMap at all, and a zip inferred from coordinates is only approximate — reverse

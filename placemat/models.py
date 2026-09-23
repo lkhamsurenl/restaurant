@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from enum import StrEnum
+from typing import ClassVar
 
 from pydantic import BaseModel, Field
 
@@ -36,6 +37,45 @@ class LocationSource(StrEnum):
     MANUAL = "manual"
 
 
+class Ratings(BaseModel):
+    """Per-attribute scores, to sit alongside the overall rating and the note.
+
+    Two rules hold this together:
+
+    Every score runs 1-5 and **higher is always better**, which is why the noise
+    dimension is stored as `quiet` rather than `noise`. Mixed directions make an
+    average meaningless, and averaging across attributes is the point - it is what
+    lets the prompt say "they mark vibe harshly and food generously".
+
+    Every score is optional, and a blank is not a zero. These exist to capture
+    dimensions that recur often enough to compare; anything idiosyncratic stays in
+    `notes`, where "dog friendly" and "they have a tablet you can use to order"
+    live. The attribute set was chosen from what actually appeared in the notes
+    three or more times, because a wider schema is mostly empty and a sparse score
+    is worse than no score - it reads as a judgment that was never made.
+    """
+
+    food: int | None = Field(default=None, ge=1, le=5)
+    vibe: int | None = Field(default=None, ge=1, le=5, description="Room, decor, atmosphere")
+    quiet: int | None = Field(default=None, ge=1, le=5, description="5 = pleasantly quiet")
+    service: int | None = Field(default=None, ge=1, le=5, description="Staff, and the wait")
+    value: int | None = Field(default=None, ge=1, le=5, description="What you got for the price")
+
+    FIELDS: ClassVar[tuple[str, ...]] = ("food", "vibe", "quiet", "service", "value")
+
+    def scored(self) -> dict[str, int]:
+        """Only the attributes actually filled in."""
+        return {f: v for f in self.FIELDS if (v := getattr(self, f)) is not None}
+
+    @property
+    def any_set(self) -> bool:
+        return bool(self.scored())
+
+    def summary(self) -> str:
+        """Compact form for a prompt or a list line: "food 5 · vibe 2 · value 3"."""
+        return " · ".join(f"{f} {v}" for f, v in self.scored().items())
+
+
 class Restaurant(BaseModel):
     # Bibliographic-ish, mostly filled from OpenStreetMap.
     name: str
@@ -59,6 +99,7 @@ class Restaurant(BaseModel):
 
     # Personal. Hand-edited, and what actually drives recommendations.
     rating: int | None = Field(default=None, ge=1, le=5)
+    ratings: Ratings = Field(default_factory=Ratings)
     status: Status = Status.VISITED
     price: int | None = Field(default=None, ge=1, le=4)
     date_visited: str | None = None

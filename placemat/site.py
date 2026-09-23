@@ -165,8 +165,10 @@ TEMPLATE = Template(
 
   {% if picks %}
   <h2>Recommended near {{ recs.target.label }}
-    <span class="qual">— within {{ (recs.radius_used_m / 1000)|round|int }}km,
-    {{ recs.candidates_considered }} of {{ recs.candidates_available }} venues considered</span>
+    <span class="qual">— {{ picks|length }} picks within
+    {{ (recs.radius_used_m / 1000)|round|int }}km,
+    from {{ recs.candidates_considered }} of {{ recs.candidates_available }} venues
+    {%- if withheld %}; {{ withheld }} lower-confidence picks not shown{% endif %}</span>
   </h2>
   <div class="grid">
   {% for rec in picks %}
@@ -265,6 +267,7 @@ def render(
     recs: Recommendations | None = None,
     output_dir: Path = OUTPUT_DIR,
     title: str = "Where We've Eaten",
+    limit: int | None = 20,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -282,6 +285,15 @@ def render(
             {"label": label, "places": [_Shown(r) for r in places], "svg": _svg(places)}
         )
 
+    # Publish the most confident picks first, and cap how many reach the page.
+    # How many to *ask* for and how many are worth *showing* are separate calls: a
+    # long run is useful for choosing from, but twenty-odd cards ahead of the
+    # library would bury it.
+    picks: list[_View] = []
+    if recs:
+        ranked = sorted(recs.recommendations, key=lambda r: -r.confidence)
+        picks = [_View(r) for r in (ranked[:limit] if limit else ranked)]
+
     scores = [r.rating for r in shown if r.rating]
     html = TEMPLATE.render(
         title=title,
@@ -291,7 +303,8 @@ def render(
         loved=[r for r in shown if r.is_positive],
         avg=f"{sum(scores) / len(scores):.1f}" if scores else None,
         recs=recs,
-        picks=[_View(r) for r in recs.recommendations] if recs else [],
+        picks=picks,
+        withheld=(len(recs.recommendations) - len(picks)) if recs else 0,
     )
     output = output_dir / "index.html"
     output.write_text(html)

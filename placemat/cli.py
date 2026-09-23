@@ -459,7 +459,7 @@ def list_places(min_rating, skipped, want, city, cuisine, near, radius_km, count
 
 @main.command()
 @click.argument("target")
-@click.option("--count", "-c", default=8, help="How many to ask for.")
+@click.option("--count", "-c", default=20, help="How many to ask for.")
 @click.option("--radius-km", default=30.0, help="How far you're willing to go.")
 @click.option("--limit", default=140, help="Max candidate venues to put in the prompt.")
 @click.option("--kind", "kinds", multiple=True,
@@ -562,7 +562,9 @@ def recommend(target, count, radius_km, limit, kinds, chains, off_list, dry_run,
 
 @main.command()
 @click.option("--title", default="Where We've Eaten", help="Page heading.")
-def build(title) -> None:
+@click.option("--limit", default=20,
+              help="Most recommendations to publish, highest confidence first. 0 for all.")
+def build(title, limit) -> None:
     """Render the static site to docs/index.html."""
     from . import site
 
@@ -571,7 +573,7 @@ def build(title) -> None:
     if RECOMMENDATIONS_PATH.exists():
         recs = Recommendations.model_validate_json(RECOMMENDATIONS_PATH.read_text())
 
-    output = site.render(library, recs, title=title)
+    output = site.render(library, recs, title=title, limit=limit or None)
     shown = [r for r in library.restaurants if r.status is not Status.NOT_INTERESTED]
     cities = {r.place_label for r in shown}
     click.echo(f"Wrote {output} ({len(shown)} places, {len(cities)} cities)")

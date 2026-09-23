@@ -150,12 +150,17 @@ eats list --skipped
 Get recommendations:
 
 ```bash
-eats recommend 96707                    # 8 places within 30km
+eats recommend 96707                    # 20 places within 30km
 eats recommend "Kapolei, HI" --count 5
 eats recommend 96707 --radius-km 10     # keep it close
 eats recommend 96707 --kind restaurant --kind cafe
 eats recommend 96707 --dry-run          # see the prompt, spend nothing
 ```
+
+Expect quality to taper down the list. The first few picks are the ones the reasoning really
+supports; by the twentieth the model is working further from your notes, and the
+`confidence` values should show it. Read a long run as a shortlist to browse, not twenty
+equally good suggestions.
 
 **The default radius is 30km, and that number matters more than any other setting.** Within
 10km of 96707 there are 29 independent restaurants; within 30km there are 683, because the
@@ -172,8 +177,15 @@ estimate and the cuisine spread of the shortlist, without calling the API.
 Render the static site:
 
 ```bash
-eats build     # -> docs/index.html
+eats build                  # -> docs/index.html, top 20 picks
+eats build --limit 8        # publish fewer
+eats build --limit 0        # publish every pick from the last run
 ```
+
+`--limit` orders picks by confidence and caps how many reach the page. How many to *ask*
+for and how many are worth *showing* are separate decisions — a long run is useful to browse
+privately, but a wall of cards ahead of the library buries it. The heading says how many
+were withheld.
 
 Open `docs/index.html` directly, or publish it with GitHub Pages: Settings → Pages → deploy
 from branch `main`, folder `/docs`.

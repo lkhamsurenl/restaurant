@@ -31,41 +31,81 @@ def format_km(km: float) -> str:
     return f"{km:.1f}km"
 
 
-def project(
-    points: list[tuple[float, float]], width: float, height: float, pad: float = 8.0
-) -> list[tuple[float, float]]:
-    """Equirectangular projection into an SVG box, x scaled by cos(mean latitude).
+class Viewport:
+    """Maps lat/lon onto an SVG box sized to fit the data.
 
-    Fine at city scale, which is all we ever draw; wrong at continental scale.
-    Returns (x, y) pairs with y already flipped for SVG's downward axis.
+    Replaces forcing every map into one fixed rectangle. The restaurants in a city
+    span roughly as far north-south as east-west, so squeezing them into a wide box
+    left a third of the width empty while the points crowded the middle. Here the
+    box takes its shape from the data, within limits so one outlier cannot produce
+    a sliver.
+
+    A minimum span also matters: nine places inside half a kilometre would
+    otherwise zoom until the map implied a precision the dots do not have.
     """
-    if not points:
-        return []
 
-    lats = [p[0] for p in points]
-    lons = [p[1] for p in points]
-    mean_lat = sum(lats) / len(lats)
-    xscale = math.cos(math.radians(mean_lat)) or 1.0
+    MIN_SPAN_DEG = 0.02  # roughly 2km, so a tight cluster doesn't zoom absurdly
+    MIN_ASPECT, MAX_ASPECT = 0.5, 1.6
 
-    xs = [lon * xscale for lon in lons]
-    min_x, max_x = min(xs), max(xs)
-    min_y, max_y = min(lats), max(lats)
+    def __init__(
+        self,
+        points: list[tuple[float, float]],
+        width: float = 560.0,
+        pad_fraction: float = 0.12,
+        margin: float = 14.0,
+    ) -> None:
+        lats = [p[0] for p in points]
+        lons = [p[1] for p in points]
+        mean_lat = sum(lats) / len(lats)
+        self._xscale = math.cos(math.radians(mean_lat)) or 1.0
 
-    span_x = (max_x - min_x) or 1e-6
-    span_y = (max_y - min_y) or 1e-6
-    # One scale for both axes keeps the aspect ratio honest.
-    scale = min((width - 2 * pad) / span_x, (height - 2 * pad) / span_y)
+        south, north = min(lats), max(lats)
+        west, east = min(lons), max(lons)
 
-    # Centre whatever slack the shared scale leaves over.
-    off_x = (width - span_x * scale) / 2
-    off_y = (height - span_y * scale) / 2
+        # Pad outwards so nothing sits on the frame, then enforce a floor.
+        span_lat = max((north - south) * (1 + 2 * pad_fraction), self.MIN_SPAN_DEG)
+        span_lon = max(
+            (east - west) * (1 + 2 * pad_fraction), self.MIN_SPAN_DEG / self._xscale
+        )
+        mid_lat, mid_lon = (north + south) / 2, (east + west) / 2
 
-    out = []
-    for lat, lon in points:
-        x = (lon * xscale - min_x) * scale + off_x
-        y = height - ((lat - min_y) * scale + off_y)  # SVG y grows downward
-        out.append((x, y))
-    return out
+        self.south, self.north = mid_lat - span_lat / 2, mid_lat + span_lat / 2
+        self.west, self.east = mid_lon - span_lon / 2, mid_lon + span_lon / 2
+
+        # Ground width and height of the view, in comparable units.
+        ground_w = span_lon * self._xscale
+        ground_h = span_lat
+        aspect = min(max(ground_h / ground_w, self.MIN_ASPECT), self.MAX_ASPECT)
+
+        self.width = width
+        self.height = width * aspect
+        self.margin = margin
+
+        inner_w = self.width - 2 * margin
+        inner_h = self.height - 2 * margin
+        # One scale for both axes keeps the shape honest; whichever axis binds wins.
+        self.scale = min(inner_w / ground_w, inner_h / ground_h)
+        self._off_x = (self.width - ground_w * self.scale) / 2
+        self._off_y = (self.height - ground_h * self.scale) / 2
+
+    def xy(self, lat: float, lon: float) -> tuple[float, float]:
+        x = (lon - self.west) * self._xscale * self.scale + self._off_x
+        y = self.height - ((lat - self.south) * self.scale + self._off_y)
+        return x, y
+
+    def contains(self, lat: float, lon: float) -> bool:
+        return self.south <= lat <= self.north and self.west <= lon <= self.east
+
+    @property
+    def tolerance_deg(self) -> float:
+        """Simplification tolerance worth about half a pixel at this scale."""
+        return 0.5 / self.scale
+
+    @property
+    def km_per_px(self) -> float:
+        return haversine_km(self.south, self.west, self.south, self.east) / max(
+            (self.east - self.west) * self._xscale * self.scale, 1e-9
+        )
 
 
 def scale_bar_km(points: list[tuple[float, float]]) -> float:

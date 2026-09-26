@@ -7,71 +7,174 @@ from pathlib import Path
 
 from jinja2 import Template
 
-from .geo import osm_element_url, osm_point_url, project, scale_bar_km
+from . import basemap
+from .geo import Viewport, osm_element_url, osm_point_url, scale_bar_km
 from .models import Library, LocationSource, Recommendations, Restaurant, Status, fold
 
 # GitHub Pages only serves from the repo root or /docs when deploying from a
 # branch - an arbitrary folder like site/ is not selectable.
 OUTPUT_DIR = Path("docs")
 
-MAP_W, MAP_H = 440.0, 240.0
-
 RATING_COLORS = {5: "#2f7d5c", 4: "#6aa84f", 3: "#c9a227", 2: "#c1663c", 1: "#a63d3d"}
 
 
+# Rough width of one character at the label's 9.5px sans-serif size. Good enough to
+# keep text inside the frame without measuring glyphs.
+_CHAR_PX = 5.3
+_LINE_PX = 11.0
+
+
+def _label_box(
+    x: float, y: float, dx: float, dy: float, anchor: str, width: float
+) -> tuple[float, float, float, float]:
+    """The rectangle a label would occupy, for overlap and edge tests."""
+    left = {"start": x + dx, "end": x + dx - width, "middle": x + dx - width / 2}[anchor]
+    return left, y + dy - _LINE_PX * 0.8, left + width, y + dy + _LINE_PX * 0.2
+
+
+def _place_label(
+    placed: list[tuple[float, float, float, float]],
+    x: float,
+    y: float,
+    text: str,
+    view_w: float,
+    view_h: float,
+) -> tuple[float, float, str] | None:
+    """Choose a side for a label that stays in frame and clear of the others.
+
+    Tries right, left, above, below, then the diagonals. Returns None when every
+    position collides, which is better than stacking unreadable text: the name is
+    still in the circle's tooltip.
+    """
+    width = len(text) * _CHAR_PX
+    for dx, dy, anchor in (
+        (9, 3.5, "start"),
+        (-9, 3.5, "end"),
+        (0, -9, "middle"),
+        (0, 15, "middle"),
+        (9, -8, "start"),
+        (-9, -8, "end"),
+        (9, 14, "start"),
+        (-9, 14, "end"),
+    ):
+        box = _label_box(x, y, dx, dy, anchor, width)
+        # Must sit fully inside the frame - an overflowing label is simply cut off.
+        if box[0] < 4 or box[2] > view_w - 4 or box[1] < 2 or box[3] > view_h - 22:
+            continue
+        if any(
+            box[0] < p[2] and p[0] < box[2] and box[1] < p[3] and p[1] < box[3]
+            for p in placed
+        ):
+            continue
+        return dx, dy, anchor
+    return None
+
+
 def _svg(places: list[Restaurant]) -> str | None:
-    """A coordinate scatter for one city, generated at build time.
+    """A labelled map for one city, with a real coastline, generated at build time.
 
-    Deliberately not an interactive map. A Leaflet map would mean a CDN script
-    dependency and, worse, every page view hitting tile.openstreetmap.org - whose
-    usage policy forbids systematic use by third-party sites, which a public
-    GitHub Pages page pulling tiles squarely is. This is ~2KB of inline SVG with no
-    JS, no network and no licence question beyond the attribution already owed.
+    Still no tiles and no JavaScript: OpenStreetMap's tile policy rules out a
+    published page fetching tiles on every view, and a CDN dependency would break
+    the page offline. The coastline is ODbL *data*, pulled once at build time and
+    embedded, so it costs nothing at view time and is already covered by the
+    attribution in the footer.
 
-    Its ceiling is honest: a scatter with no streets shows clustering and nothing
-    else. Anyone who wants a real map clicks through to OSM.
+    The coastline is what makes this legible. Without it the map was a handful of
+    dots in an empty rectangle, with no way to tell which side of town anything was
+    on - the honest ceiling noted when this started as a bare scatter.
     """
     located = [r for r in places if r.has_location]
     if len(located) < 2:
         return None
 
     points = [(r.lat, r.lon) for r in located]  # type: ignore[misc]
-    xy = project(points, MAP_W, MAP_H)
-    bar_km = scale_bar_km(points)
+    view = Viewport(points)
 
-    # Pixels per km, derived from the plotted span, for the scale bar.
-    lats = [p[0] for p in points]
-    lons = [p[1] for p in points]
-    from .geo import haversine_km
+    layers: list[str] = []
 
-    span_km = haversine_km(min(lats), min(lons), min(lats), max(lons)) or 1.0
-    span_px = max(x for x, _ in xy) - min(x for x, _ in xy) or 1.0
-    bar_px = min(bar_km * (span_px / span_km), MAP_W - 60)
-
-    dots = []
-    for restaurant, (x, y) in zip(located, xy):
-        color = RATING_COLORS.get(restaurant.rating or 0, "#9b9892")
-        radius = 6 if restaurant.is_positive else 4.5
-        label = restaurant.name
-        if restaurant.rating:
-            label += f" ({restaurant.rating}/5)"
-        dots.append(
-            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{radius}" fill="{color}" '
-            f'fill-opacity=".85" stroke="var(--card)" stroke-width="1.5">'
-            f"<title>{_escape(label)}</title></circle>"
+    # Coastline first, so it sits under the dots.
+    paths = basemap.coastline(
+        view.south, view.west, view.north, view.east, view.tolerance_deg
+    )
+    for path in paths:
+        xy = [view.xy(lat, lon) for lat, lon in path]
+        # Keep any way that passes near the view; clipping exactly is not worth it
+        # when the SVG viewBox already crops.
+        if not any(-80 <= x <= view.width + 80 and -80 <= y <= view.height + 80
+                   for x, y in xy):
+            continue
+        d = "M" + " L".join(f"{x:.1f},{y:.1f}" for x, y in xy)
+        layers.append(
+            f'<path d="{d}" fill="none" stroke="var(--coast)" stroke-width="1.4" '
+            f'stroke-linejoin="round" stroke-linecap="round"/>'
         )
 
+    dots: list[str] = []
+    labels: list[str] = []
+    placed: list[tuple[float, float, float, float]] = []
+    # Best-rated last, so they end up on top of the pile, and labelled first, so
+    # they win the argument over where a label goes.
+    ordered = sorted(located, key=lambda r: -(r.rating or 0))
+    for restaurant in ordered:
+        x, y = view.xy(restaurant.lat, restaurant.lon)  # type: ignore[arg-type]
+        name = _shorten(restaurant.name)
+        spot = _place_label(placed, x, y, name, view.width, view.height)
+        if spot is None:
+            continue
+        dx, dy, anchor = spot
+        placed.append(_label_box(x, y, dx, dy, anchor, len(name) * _CHAR_PX))
+        labels.append(
+            f'<text x="{x + dx:.1f}" y="{y + dy:.1f}" text-anchor="{anchor}" '
+            f'class="lbl">{_escape(name)}</text>'
+        )
+
+    for restaurant in reversed(ordered):
+        x, y = view.xy(restaurant.lat, restaurant.lon)  # type: ignore[arg-type]
+        color = RATING_COLORS.get(restaurant.rating or 0, "#9b9892")
+        radius = 6 if restaurant.is_positive else 4.5
+        title = restaurant.name + (f" ({restaurant.rating}/5)" if restaurant.rating else "")
+        dots.append(
+            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{radius}" fill="{color}" '
+            f'fill-opacity=".9" stroke="var(--card)" stroke-width="1.5">'
+            f"<title>{_escape(title)}</title></circle>"
+        )
+
+    bar_km = scale_bar_km(points)
+    bar_px = min(bar_km / max(view.km_per_px, 1e-9), view.width - 80)
+    baseline = view.height - 16
+
     return (
-        f'<svg class="scatter" viewBox="0 0 {MAP_W:.0f} {MAP_H:.0f}" '
-        f'role="img" aria-label="Approximate locations of these places">'
-        f'<rect x="1" y="1" width="{MAP_W - 2:.0f}" height="{MAP_H - 2:.0f}" '
+        f'<svg class="scatter" viewBox="0 0 {view.width:.0f} {view.height:.0f}" '
+        f'role="img" aria-label="Where these places are, with the coastline for reference">'
+        f'<rect x="1" y="1" width="{view.width - 2:.0f}" height="{view.height - 2:.0f}" '
         f'fill="none" stroke="var(--line)" rx="6"/>'
+        + "".join(layers)
         + "".join(dots)
-        + f'<line x1="20" y1="{MAP_H - 18:.0f}" x2="{20 + bar_px:.0f}" '
-        f'y2="{MAP_H - 18:.0f}" stroke="var(--muted)" stroke-width="2"/>'
-        f'<text x="20" y="{MAP_H - 24:.0f}" font-size="10" fill="var(--muted)">'
-        f"{bar_km:g}km</text></svg>"
+        + "".join(labels)
+        + f'<line x1="18" y1="{baseline:.1f}" x2="{18 + bar_px:.1f}" '
+        f'y2="{baseline:.1f}" stroke="var(--muted)" stroke-width="2"/>'
+        f'<text x="18" y="{baseline - 6:.1f}" class="lbl">{bar_km:g}km</text>'
+        f"</svg>"
     )
+
+
+_NOISE_WORDS = (
+    " Restaurant", " Cuisine", " & Lounge", " Ristorante", " Kitchen & Bar",
+)
+
+
+def _shorten(name: str, limit: int = 20) -> str:
+    """Trim a name to something a map label can carry.
+
+    Drops the generic half first - "Olay's Thai Lao Cuisine" reads fine as "Olay's
+    Thai Lao" - and only falls back to clipping mid-word when that isn't enough.
+    """
+    for word in _NOISE_WORDS:
+        if len(name) > limit and word in name:
+            name = name.replace(word, "", 1).strip()
+    if len(name) <= limit:
+        return name
+    return name[: limit - 1].rstrip(" ,-") + "…"
 
 
 def _escape(value: str) -> str:
@@ -94,11 +197,12 @@ TEMPLATE = Template(
   :root {
     color-scheme: light dark;
     --bg: #fbf9f6; --fg: #1c1a18; --muted: #6f6a63;
-    --card: #ffffff; --line: #e7e1d8; --accent: #b4552d;
+    --card: #ffffff; --line: #e7e1d8; --accent: #b4552d; --coast: #c7d6da;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #17161a; --fg: #ecebe8; --muted: #9b9892;
-            --card: #201f25; --line: #34313b; --accent: #e08a5f; }
+            --card: #201f25; --line: #34313b; --accent: #e08a5f;
+            --coast: #3c4f56; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--fg);
@@ -133,6 +237,8 @@ TEMPLATE = Template(
            text-transform: uppercase; letter-spacing: .06em; display: block; }
   .scatter { width: 100%; height: auto; margin: .5rem 0 1.5rem;
              background: var(--card); border-radius: 10px; }
+  .scatter .lbl { font-size: 9.5px; fill: var(--muted);
+                  font-family: ui-sans-serif, system-ui, sans-serif; }
   .chips span { display: inline-block; font-size: .75rem; padding: .1rem .4rem;
                 border: 1px solid var(--line); border-radius: 999px;
                 margin: .2rem .2rem 0 0; color: var(--muted); }
@@ -332,5 +438,5 @@ def render(
         ),
     )
     output = output_dir / "index.html"
-    output.write_text(html)
+    output.write_text(html, encoding="utf-8")
     return output

@@ -309,8 +309,19 @@ Venue data and coordinates come from [OpenStreetMap](https://www.openstreetmap.o
 the [ODbL](https://opendatacommons.org/licenses/odbl/). No API key needed; attribution is a
 licence condition, not a courtesy, so leave the footer credit in place.
 
-The map on the generated page is a build-time SVG scatter rather than an interactive map.
-That's deliberate: an embedded map would mean a CDN script dependency and every page view
-hitting OpenStreetMap's tile servers, which their tile usage policy forbids for third-party
-sites. The scatter shows clustering and nothing else; each place links through to OSM for a
-real map.
+The maps on the generated page are built at render time as inline SVG — a real coastline,
+labelled points coloured by rating, and a scale bar. There is no JavaScript, no CDN
+dependency and no network request when the page is viewed.
+
+Tiles are still deliberately avoided: OpenStreetMap's tile usage policy forbids systematic
+use by third-party sites, which a published page fetching tiles on every view plainly is.
+Coastline *geometry* is a different matter — an ordinary ODbL data extract, fetched once,
+simplified with Douglas–Peucker at about half a pixel of tolerance, and written into the
+HTML. It's cached for ten years, because coastlines don't move, and `build` degrades to a
+plain scatter if OpenStreetMap is unreachable.
+
+Each map sizes itself to its own data rather than being forced into a fixed rectangle, so
+the points fill the frame instead of huddling in the middle, and labels flip to whichever
+side keeps them inside it. A label that can't be placed without overlapping is dropped
+rather than stacked — the name is still in the point's tooltip. Each place also links
+through to OSM for a real map.

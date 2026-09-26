@@ -29,6 +29,33 @@
       "zip": "96814"
     },
     {
+      "address": "10 North Hotel Street",
+      "boycott": false,
+      "city": "Honolulu",
+      "cuisine": [
+        "italian",
+        "asian"
+      ],
+      "dishes": [],
+      "lat": 21.3112707,
+      "location_source": "osm-tags",
+      "lon": -157.86207,
+      "name": "Giovedi",
+      "notes": "Good Italian food, mocktail was great. We sat inside, good for groups. No free parking though.",
+      "osm_id": 5824610255,
+      "osm_type": "node",
+      "permanently_closed": false,
+      "rating": 4,
+      "ratings": {
+        "food": 4,
+        "vibe": 4
+      },
+      "state": "Hawaii",
+      "status": "visited",
+      "tags": [],
+      "website": "https://www.giovedihawaii.com/"
+    },
+    {
       "address": "2700 S King St",
       "amenity": "restaurant",
       "boycott": false,

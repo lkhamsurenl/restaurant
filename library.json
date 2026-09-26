@@ -229,6 +229,32 @@
       "zip": "96815"
     },
     {
+      "address": "Olani Street",
+      "boycott": false,
+      "city": "Kapolei",
+      "cuisine": [
+        "seafood"
+      ],
+      "dishes": [],
+      "lat": 21.3388903,
+      "location_source": "reverse",
+      "lon": -158.12543,
+      "name": "Mina’s Fish House",
+      "notes": "Amazing view, terrace seating, very good food presentation. Good for a celebration. Parking validation as well.",
+      "osm_id": 9829842914,
+      "osm_type": "node",
+      "permanently_closed": false,
+      "rating": 5,
+      "ratings": {
+        "food": 5,
+        "vibe": 5
+      },
+      "state": "Hawaii",
+      "status": "visited",
+      "tags": [],
+      "zip": "96707"
+    },
+    {
       "address": "92-1048 Olani St",
       "amenity": "restaurant",
       "boycott": false,

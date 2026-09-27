@@ -127,6 +127,18 @@ target area. Stay within the off-list budget given in the request, and use it on
 when you are confident the place exists and is still open."""
 
 
+def _token_budget(count: int) -> int:
+    """Output allowance for a run of `count` picks.
+
+    Has to scale with the ask. Each recommendation costs roughly 435 output tokens
+    - reason, avoids, dish and diet_fit are all prose - so a fixed 16,000 was fine
+    for eight picks and silently short for fifty, which need about 21,700 before
+    any thinking at all. Adaptive thinking draws from the same allowance, hence the
+    flat headroom on top.
+    """
+    return min(64_000, 8_000 + count * 700)
+
+
 def attribute_profile(library: Library) -> list[str]:
     """Describe how this eater uses the attribute scores, and what sinks a place.
 
@@ -418,9 +430,14 @@ def generate(
     listing = candidates_mod.serialize(shortlist, target, radius_used_m, pool)
 
     client = anthropic.Anthropic()
-    response = client.messages.parse(
+    # Streamed rather than a plain parse: asking for fifty picks needs a
+    # max_tokens large enough that the SDK refuses to run it unstreamed, because a
+    # single response could outlast the HTTP timeout. `messages.stream` takes the
+    # same `output_format`, and `get_final_message()` returns the parsed result
+    # once the whole response has arrived - nothing here consumes it incrementally.
+    with client.messages.stream(
         model=MODEL,
-        max_tokens=16000,
+        max_tokens=_token_budget(count),
         thinking={"type": "adaptive"},
         system=SYSTEM,
         messages=[
@@ -438,10 +455,18 @@ def generate(
             }
         ],
         output_format=RecommendationList,
-    )
+    ) as stream:
+        response = stream.get_final_message()
 
     if response.stop_reason == "refusal":
         raise RuntimeError(f"The model declined this request: {response.stop_details}")
+    if response.stop_reason == "max_tokens":
+        # Otherwise this surfaces as a short or malformed list and looks like the
+        # model simply had less to say.
+        raise RuntimeError(
+            f"Ran out of output tokens at {_token_budget(count):,} for {count} picks. "
+            "Ask for fewer with --count, or raise the budget in _token_budget()."
+        )
 
     verified, dropped = _verify(
         response.parsed_output.recommendations, library, shortlist, target, off_list

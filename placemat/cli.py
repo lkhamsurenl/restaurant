@@ -531,9 +531,10 @@ def list_places(min_rating, skipped, want, city, cuisine, near, radius_km, count
 
 @main.command()
 @click.argument("target")
-@click.option("--count", "-c", default=20, help="How many to ask for.")
+@click.option("--count", "-c", default=50, help="How many to ask for.")
 @click.option("--radius-km", default=30.0, help="How far you're willing to go.")
-@click.option("--limit", default=140, help="Max candidate venues to put in the prompt.")
+@click.option("--limit", default=140,
+              help="Max candidate venues in the prompt. Raised automatically if --count needs more to choose from.")
 @click.option("--kind", "kinds", multiple=True,
               help="Venue kinds to consider. Default: restaurant. Repeatable.")
 @click.option("--chains/--no-chains", default=False, help="Include chain outlets.")
@@ -561,10 +562,14 @@ def recommend(target, count, radius_km, limit, kinds, chains, off_list, dry_run,
     click.echo(f"Reading {len(library.restaurants)} places from library.json...")
     click.echo(f"Finding venues near {resolved.label}...")
 
+    # A shortlist barely bigger than the ask leaves nothing to choose between, so
+    # keep at least a few candidates per pick regardless of what --limit says.
+    effective_limit = max(limit, count * 4)
+
     shortlist, radius_used, pool = candidates_mod.retrieve(
         resolved,
         library,
-        limit=limit,
+        limit=effective_limit,
         kinds=tuple(kinds) or ("restaurant",),
         chains=chains,
     )
@@ -636,7 +641,7 @@ def recommend(target, count, radius_km, limit, kinds, chains, off_list, dry_run,
 
 @main.command()
 @click.option("--title", default="Where We've Eaten", help="Page heading.")
-@click.option("--limit", default=20,
+@click.option("--limit", default=50,
               help="Most recommendations to publish, highest confidence first. 0 for all.")
 def build(title, limit) -> None:
     """Render the static site to docs/index.html."""

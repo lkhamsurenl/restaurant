@@ -223,7 +223,7 @@ eats list --skipped
 Get recommendations:
 
 ```bash
-eats recommend 96707                    # 20 places within 30km
+eats recommend 96707                    # 50 places within 30km
 eats recommend "Kapolei, HI" --count 5
 eats recommend 96707 --radius-km 10     # keep it close
 eats recommend 96707 --kind restaurant --kind cafe
@@ -231,9 +231,17 @@ eats recommend 96707 --dry-run          # see the prompt, spend nothing
 ```
 
 Expect quality to taper down the list. The first few picks are the ones the reasoning really
-supports; by the twentieth the model is working further from your notes, and the
-`confidence` values should show it. Read a long run as a shortlist to browse, not twenty
-equally good suggestions.
+supports; by the fiftieth the model is working much further from your notes, and the
+`confidence` values show it - a 50-pick run currently spans 70% down to 30%. Read a long run
+as a shortlist to browse, not fifty equally good suggestions.
+
+Two things scale with `--count` automatically. The candidate shortlist grows to at least four
+venues per pick, because a shortlist barely larger than the ask leaves nothing to choose
+between. And the output token budget grows with it - each recommendation costs roughly 435
+tokens of prose, so fifty picks need about 22,000 before any thinking at all. Past a certain
+size the SDK requires streaming, since one response can outlast the HTTP timeout, so the
+request is streamed and the budget is sized from `--count`. A run that still hits the ceiling
+fails loudly rather than returning a quietly truncated list.
 
 **The default radius is 30km, and that number matters more than any other setting.** Within
 10km of 96707 there are 29 independent restaurants; within 30km there are 683, because the
@@ -250,7 +258,7 @@ estimate and the cuisine spread of the shortlist, without calling the API.
 Render the static site:
 
 ```bash
-eats build                  # -> docs/index.html, top 20 picks
+eats build                  # -> docs/index.html, top 50 picks
 eats build --limit 8        # publish fewer
 eats build --limit 0        # publish every pick from the last run
 ```

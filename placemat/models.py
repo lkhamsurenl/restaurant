@@ -37,43 +37,10 @@ class LocationSource(StrEnum):
     MANUAL = "manual"
 
 
-class Ratings(BaseModel):
-    """Per-attribute scores, to sit alongside the overall rating and the note.
-
-    Two rules hold this together:
-
-    Every score runs 1-5 and **higher is always better**, which is why the noise
-    dimension is stored as `quiet` rather than `noise`. Mixed directions make an
-    average meaningless, and averaging across attributes is the point - it is what
-    lets the prompt say "they mark vibe harshly and food generously".
-
-    Every score is optional, and a blank is not a zero. These exist to capture
-    dimensions that recur often enough to compare; anything idiosyncratic stays in
-    `notes`, where "dog friendly" and "they have a tablet you can use to order"
-    live. The attribute set was chosen from what actually appeared in the notes
-    three or more times, because a wider schema is mostly empty and a sparse score
-    is worse than no score - it reads as a judgment that was never made.
-    """
-
-    food: int | None = Field(default=None, ge=1, le=5)
-    vibe: int | None = Field(default=None, ge=1, le=5, description="Room, decor, atmosphere")
-    quiet: int | None = Field(default=None, ge=1, le=5, description="5 = pleasantly quiet")
-    service: int | None = Field(default=None, ge=1, le=5, description="Staff, and the wait")
-    value: int | None = Field(default=None, ge=1, le=5, description="What you got for the price")
-
-    FIELDS: ClassVar[tuple[str, ...]] = ("food", "vibe", "quiet", "service", "value")
-
-    def scored(self) -> dict[str, int]:
-        """Only the attributes actually filled in."""
-        return {f: v for f in self.FIELDS if (v := getattr(self, f)) is not None}
-
-    @property
-    def any_set(self) -> bool:
-        return bool(self.scored())
-
-    def summary(self) -> str:
-        """Compact form for a prompt or a list line: "food 5 · vibe 2 · value 3"."""
-        return " · ".join(f"{f} {v}" for f, v in self.scored().items())
+def summarize_scores(scores: dict[str, int], order: tuple[str, ...] = ()) -> str:
+    """Compact form for a prompt or a list line: "food 5 · vibe 2 · value 3"."""
+    keys = [k for k in order if k in scores] + [k for k in scores if k not in order]
+    return " · ".join(f"{k} {scores[k]}" for k in keys)
 
 
 class Restaurant(BaseModel):
@@ -99,7 +66,18 @@ class Restaurant(BaseModel):
 
     # Personal. Hand-edited, and what actually drives recommendations.
     rating: int | None = Field(default=None, ge=1, le=5)
-    ratings: Ratings = Field(default_factory=Ratings)
+    ratings: dict[str, int] = Field(default_factory=dict)
+    """Per-attribute scores, 1-5, all higher-is-better.
+
+    A plain mapping rather than fixed fields, because the axes depend on what is
+    being judged: a restaurant is scored on food and quiet, a matcha spot on the
+    quality of the tea and whether it is prepared properly. The domain owns the
+    valid keys and validates them; see `domains.py`.
+
+    Every score is optional and a blank is not a zero. These capture dimensions
+    that recur often enough to compare - anything idiosyncratic stays in `notes`,
+    where "dog friendly" and "they have a tablet you can use to order" live.
+    """
     status: Status = Status.VISITED
     price: int | None = Field(default=None, ge=1, le=4)
     date_visited: str | None = None

@@ -9,12 +9,13 @@ from pathlib import Path
 import click
 
 from . import candidates as candidates_mod
-from . import nominatim, osm, overpass, store
+from . import domains, nominatim, osm, overpass, store
+from .domains import Domain
 from .geo import haversine_km
 from .models import (
     Household,
     LocationSource,
-    Ratings,
+    summarize_scores,
     Recommendations,
     Restaurant,
     Status,
@@ -22,12 +23,23 @@ from .models import (
     fold,
 )
 
-RECOMMENDATIONS_PATH = Path("recommendations.json")
-
-
 @click.group()
-def main() -> None:
-    """Track restaurants you've eaten at and get recommendations for where to go next."""
+@click.pass_context
+def main(ctx: click.Context) -> None:
+    """Track places you've been and get recommendations for where to go next."""
+    # Set by the entry points below. Every command reads it with @click.pass_obj,
+    # so the whole CLI is domain-agnostic and adding a domain adds no commands.
+    ctx.obj = ctx.obj or domains.RESTAURANTS
+
+
+def restaurants() -> None:
+    """Console entry point for `eats`."""
+    main(obj=domains.RESTAURANTS)
+
+
+def matcha() -> None:
+    """Console entry point for `matcha`."""
+    main(obj=domains.MATCHA)
 
 
 def _resolve_area(city: str | None, zipcode: str | None, country: str):
@@ -148,10 +160,13 @@ def _add_by_address(restaurant: Restaurant, name: str, address: str, country: st
 @click.option("--rating", "-r", type=click.IntRange(1, 5),
               help="How much you liked it overall, 1-5. The main signal.")
 @click.option("--note", "-n", help="Why it landed (or didn't). Still the most useful field.")
-@click.option("--food", type=click.IntRange(1, 5), help="Attribute score, 1-5.")
+@click.option("--food", type=click.IntRange(1, 5), help="[restaurants] The cooking itself. 1-5.")
+@click.option("--quiet", type=click.IntRange(1, 5), help="[restaurants] 5 = pleasantly quiet. 1-5.")
+@click.option("--service", type=click.IntRange(1, 5), help="[restaurants] Staff and the wait. 1-5.")
+@click.option("--quality", type=click.IntRange(1, 5), help="[matcha] The tea itself. 1-5.")
+@click.option("--preparation", type=click.IntRange(1, 5),
+              help="[matcha] Made properly, or sweet powder in milk? 1-5.")
 @click.option("--vibe", type=click.IntRange(1, 5), help="Room, decor, atmosphere. 1-5.")
-@click.option("--quiet", type=click.IntRange(1, 5), help="5 = pleasantly quiet. 1-5.")
-@click.option("--service", type=click.IntRange(1, 5), help="Staff and the wait. 1-5.")
 @click.option("--value", type=click.IntRange(1, 5), help="What you got for the price. 1-5.")
 @click.option("--dish", "-d", multiple=True, help="Something worth ordering. Repeatable.")
 @click.option("--price", type=click.IntRange(1, 4), help="Your read, 1-4 ($ to $$$$).")
@@ -167,18 +182,29 @@ def _add_by_address(restaurant: Restaurant, name: str, address: str, country: st
 @click.option("--no-lookup", is_flag=True, help="Record exactly what you typed; no network.")
 @click.option("--yes", "-y", is_flag=True, help="Accept the top match without confirming.")
 @click.option("--country", default="us", help="Country filter for geocoding.")
-def add(name, address, city, zipcode, state, rating, note, food, vibe, quiet, service,
-        value, dish, price, status, date_visited, tags, boycott, lat, lon, radius_km,
-        no_lookup, yes, country) -> None:
-    """Add a restaurant to your library, enriched from OpenStreetMap."""
+@click.pass_obj
+def add(domain: Domain, name, address, city, zipcode, state, rating, note, food, quiet,
+        service, quality, preparation, vibe, value, dish, price, status, date_visited,
+        tags, boycott, lat, lon, radius_km, no_lookup, yes, country) -> None:
+    """Add a place to your library, enriched from OpenStreetMap."""
     if (lat is None) != (lon is None):
         raise click.ClickException("Pass both --lat and --lon, or neither.")
 
-    restaurant = Restaurant(
-        name=name,
-        status=Status(status),
-        ratings=Ratings(food=food, vibe=vibe, quiet=quiet, service=service, value=value),
-    )
+    # Every domain's axes are offered as flags and validated against the one in
+    # use, so `matcha add --quiet 3` fails with a readable error rather than
+    # silently recording an attribute matcha has no meaning for.
+    given = {
+        "food": food, "quiet": quiet, "service": service,
+        "quality": quality, "preparation": preparation,
+        "vibe": vibe, "value": value,
+    }
+    scores = {k: v for k, v in given.items() if v is not None}
+    try:
+        domain.validate(scores)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    restaurant = Restaurant(name=name, status=Status(status), ratings=scores)
 
     suggested = None
     if not (address or no_lookup or lat is not None):
@@ -187,7 +213,7 @@ def add(name, address, city, zipcode, state, rating, note, food, vibe, quiet, se
         # re-deriving its coordinates would cost a lookup to learn what is sitting in
         # recommendations.json. `skip` has always done this; `add` is the more common
         # path and was missing it.
-        suggested = _from_recommendations(name)
+        suggested = _from_recommendations(name, domain)
 
     if suggested is not None:
         for field in (
@@ -286,9 +312,9 @@ def add(name, address, city, zipcode, state, rating, note, food, vibe, quiet, se
     restaurant.tags = list(tags)
     restaurant.boycott = boycott
 
-    library = store.load()
+    library = store.load(domain.data_file)
     is_new = store.upsert(library, restaurant)
-    store.save(library)
+    store.save(library, domain.data_file)
 
     bits = []
     if rating:
@@ -298,8 +324,8 @@ def add(name, address, city, zipcode, state, rating, note, food, vibe, quiet, se
     label = f"  [{', '.join(bits)}]" if bits else ""
     verb = "Added" if is_new else "Updated"
     click.echo(f"{verb}: {restaurant.name} — {restaurant.place_label}{label}")
-    if restaurant.ratings.any_set:
-        click.echo(f"  {restaurant.ratings.summary()}")
+    if restaurant.ratings:
+        click.echo(f"  {summarize_scores(restaurant.ratings, domain.attribute_keys)}")
     if restaurant.boycott:
         click.echo(
             "  Marked will-not-return on principle: never recommended, and kept out "
@@ -314,7 +340,8 @@ def add(name, address, city, zipcode, state, rating, note, food, vibe, quiet, se
 @click.option("--note", "-n", help="Why you passed. Optional, but helps you remember.")
 @click.option("--closed", is_flag=True, help="Also mark it permanently closed.")
 @click.option("--country", default="us")
-def skip(name, city, zipcode, note, closed, country) -> None:
+@click.pass_obj
+def skip(domain: Domain, name, city, zipcode, note, closed, country) -> None:
     """Mark a place as not interested, so it stops being recommended.
 
     For restaurants you've heard of but never ate at - including ones this tool
@@ -323,7 +350,7 @@ def skip(name, city, zipcode, note, closed, country) -> None:
     """
     # A previously recommended place is already described in recommendations.json,
     # so dismissing one costs no lookup at all.
-    restaurant = _from_recommendations(name)
+    restaurant = _from_recommendations(name, domain)
     source = "last recommendation"
 
     if restaurant is None and (city or zipcode):
@@ -364,9 +391,9 @@ def skip(name, city, zipcode, note, closed, country) -> None:
     if closed:
         restaurant.permanently_closed = True
 
-    library = store.load()
+    library = store.load(domain.data_file)
     is_new = store.upsert(library, restaurant)
-    store.save(library)
+    store.save(library, domain.data_file)
 
     verb = "Skipping" if is_new else "Updated, now skipping"
     click.echo(f"{verb}: {restaurant.name} — {restaurant.place_label}  ({source})")
@@ -376,11 +403,11 @@ def skip(name, city, zipcode, note, closed, country) -> None:
         click.echo("It won't be recommended again.")
 
 
-def _from_recommendations(name: str) -> Restaurant | None:
+def _from_recommendations(name: str, domain: Domain) -> Restaurant | None:
     """Reuse metadata from the last recommend run, if the name is in it."""
-    if not RECOMMENDATIONS_PATH.exists():
+    if not domain.recommendations_file.exists():
         return None
-    recs = Recommendations.model_validate_json(RECOMMENDATIONS_PATH.read_text())
+    recs = Recommendations.model_validate_json(domain.recommendations_file.read_text())
     target = fold(name)
     for rec in recs.recommendations:
         if fold(rec.name) != target:
@@ -405,18 +432,19 @@ def _from_recommendations(name: str) -> Restaurant | None:
               help="A standing dietary requirement, e.g. pescatarian. Repeatable.")
 @click.option("--note", "-n", help="Nuance: how strict, who it applies to, the bar.")
 @click.option("--clear", is_flag=True, help="Remove all dietary requirements.")
-def household(diets, note, clear) -> None:
+@click.pass_obj
+def household(domain: Domain, diets, note, clear) -> None:
     """Set standing requirements that apply to every recommendation.
 
     A diet belongs here rather than on individual restaurants: it describes who is
     eating, and it disqualifies a place outright rather than scoring it down. It is
     also the one constraint the model is required to answer for every pick.
     """
-    library = store.load()
+    library = store.load(domain.data_file)
 
     if clear:
         library.household = Household()
-        store.save(library)
+        store.save(library, domain.data_file)
         click.echo("Cleared all dietary requirements.")
         return
 
@@ -436,7 +464,7 @@ def household(diets, note, clear) -> None:
         library.household.diets = list(diets)
     if note is not None:
         library.household.notes = note or None
-    store.save(library)
+    store.save(library, domain.data_file)
 
     click.echo(f"Dietary requirement: {library.household.describe()}")
     click.echo(
@@ -454,9 +482,10 @@ def household(diets, note, clear) -> None:
 @click.option("--near", help="Only places near this zip or city, nearest first.")
 @click.option("--radius-km", default=30.0, help="Radius for --near.")
 @click.option("--country", default="us")
-def list_places(min_rating, skipped, want, city, cuisine, near, radius_km, country) -> None:
+@click.pass_obj
+def list_places(domain: Domain, min_rating, skipped, want, city, cuisine, near, radius_km, country) -> None:
     """Show what's in your library."""
-    library = store.load()
+    library = store.load(domain.data_file)
 
     if skipped:
         wanted_status = Status.NOT_INTERESTED
@@ -502,7 +531,10 @@ def list_places(min_rating, skipped, want, city, cuisine, near, radius_km, count
         dist = ""
         if origin and r.has_location:
             dist = f"  ({haversine_km(*origin, r.lat, r.lon):.1f}km)"
-        scores = f"\n        {r.ratings.summary()}" if r.ratings.any_set else ""
+        scores = (
+            f"\n        {summarize_scores(r.ratings, domain.attribute_keys)}"
+            if r.ratings else ""
+        )
         note = f"\n        {r.notes}" if r.notes else ""
         return f"{stars}{price}  {r.name}{cuisines}{approx}{dist}{scores}{note}"
 
@@ -536,14 +568,15 @@ def list_places(min_rating, skipped, want, city, cuisine, near, radius_km, count
 @click.option("--limit", default=140,
               help="Max candidate venues in the prompt. Raised automatically if --count needs more to choose from.")
 @click.option("--kind", "kinds", multiple=True,
-              help="Venue kinds to consider. Default: restaurant. Repeatable.")
+              help="Venue kinds to consider. Defaults to the domain's own. Repeatable.")
 @click.option("--chains/--no-chains", default=False, help="Include chain outlets.")
 @click.option("--off-list", default=2, help="How many picks may come from outside OSM data.")
 @click.option("--dry-run", is_flag=True,
               help="Build and print the prompt without calling the model.")
 @click.option("--country", default="us")
-def recommend(target, count, radius_km, limit, kinds, chains, off_list, dry_run, country) -> None:
-    """Recommend places to eat near a zip or city, chosen from real OSM venues."""
+@click.pass_obj
+def recommend(domain: Domain, target, count, radius_km, limit, kinds, chains, off_list, dry_run, country) -> None:
+    """Recommend places near a zip or city, chosen from real OpenStreetMap venues."""
     from . import recommend as engine
 
     place = nominatim.geocode(target, country=country)
@@ -558,9 +591,11 @@ def recommend(target, count, radius_km, limit, kinds, chains, off_list, dry_run,
         radius_m=int(radius_km * 1000),
     )
 
-    library = store.load()
-    click.echo(f"Reading {len(library.restaurants)} places from library.json...")
-    click.echo(f"Finding venues near {resolved.label}...")
+    library = store.load(domain.data_file)
+    click.echo(
+        f"Reading {len(library.restaurants)} {domain.plural} from {domain.data_file}..."
+    )
+    click.echo(f"Finding {domain.plural} near {resolved.label}...")
 
     # A shortlist barely bigger than the ask leaves nothing to choose between, so
     # keep at least a few candidates per pick regardless of what --limit says.
@@ -570,7 +605,7 @@ def recommend(target, count, radius_km, limit, kinds, chains, off_list, dry_run,
         resolved,
         library,
         limit=effective_limit,
-        kinds=tuple(kinds) or ("restaurant",),
+        kinds=tuple(kinds) or domain.kinds,
         chains=chains,
     )
 
@@ -588,7 +623,7 @@ def recommend(target, count, radius_km, limit, kinds, chains, off_list, dry_run,
 
     if dry_run:
         prompt = (
-            engine.build_profile(library, resolved)
+            engine.build_profile(library, resolved, domain)
             + "\n\n"
             + candidates_mod.serialize(shortlist, resolved, radius_used, pool)
         )
@@ -601,13 +636,13 @@ def recommend(target, count, radius_km, limit, kinds, chains, off_list, dry_run,
 
     try:
         result, usage = engine.generate(
-            library, resolved, shortlist, radius_used, pool,
+            library, resolved, domain, shortlist, radius_used, pool,
             count=count, off_list=off_list,
         )
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    RECOMMENDATIONS_PATH.write_text(
+    domain.recommendations_file.write_text(
         json.dumps(
             result.model_dump(mode="json", exclude_none=True), indent=2, ensure_ascii=False
         )
@@ -634,25 +669,32 @@ def recommend(target, count, radius_km, limit, kinds, chains, off_list, dry_run,
         for item in result.dropped:
             click.echo(f"  - {item}")
 
-    click.echo(f"\nWritten to {RECOMMENDATIONS_PATH}")
+    click.echo(f"\nWritten to {domain.recommendations_file}")
     if usage:
         click.echo(f"Tokens: {usage.input_tokens} in / {usage.output_tokens} out")
 
 
 @main.command()
-@click.option("--title", default="Where We've Eaten", help="Page heading.")
+@click.option("--title", default=None, help="Page heading. Defaults to the domain's.")
 @click.option("--limit", default=50,
               help="Most recommendations to publish, highest confidence first. 0 for all.")
-def build(title, limit) -> None:
-    """Render the static site to docs/index.html."""
+@click.pass_obj
+def build(domain: Domain, title, limit) -> None:
+    """Render the static site for this domain under docs/."""
     from . import site
 
-    library = store.load()
+    library = store.load(domain.data_file)
     recs = None
-    if RECOMMENDATIONS_PATH.exists():
-        recs = Recommendations.model_validate_json(RECOMMENDATIONS_PATH.read_text())
+    if domain.recommendations_file.exists():
+        recs = Recommendations.model_validate_json(domain.recommendations_file.read_text())
 
-    output = site.render(library, recs, title=title, limit=limit or None)
+    output = site.render(
+        library,
+        recs,
+        title=title or domain.page_title,
+        limit=limit or None,
+        filename=domain.page_file,
+    )
     shown = [r for r in library.restaurants if r.status is not Status.NOT_INTERESTED]
     cities = {r.place_label for r in shown}
     click.echo(f"Wrote {output} ({len(shown)} places, {len(cities)} cities)")

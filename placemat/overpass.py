@@ -39,6 +39,7 @@ KIND_FILTERS = {
     "bar": '["amenity"="bar"]',
     "pub": '["amenity"="pub"]',
     "ice_cream": '["amenity"="ice_cream"]',
+    "tea_house": '["amenity"="tea_house"]',
     # Bakeries and delis carry no amenity tag at all in OSM - Tartine Bakery is
     # shop=bakery - so they need their own filter to be findable.
     "bakery": '["shop"="bakery"]',

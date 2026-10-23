@@ -13,7 +13,9 @@ dependencies = [
 ]
 
 [project.scripts]
-eats = "placemat.cli:main"
+# One implementation, two domains. The entry point binds which.
+eats = "placemat.cli:restaurants"
+matcha = "placemat.cli:matcha"
 
 [build-system]
 requires = ["hatchling"]

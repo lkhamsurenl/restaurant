@@ -369,7 +369,7 @@ class _Shown(_View):
         self.approx = restaurant.location_source is LocationSource.REVERSE
         # Only the attributes actually scored. An unscored one is left out entirely
         # rather than drawn empty, since a blank is not a zero.
-        self.score_bars = list(restaurant.ratings.scored().items())
+        self.score_bars = list(restaurant.ratings.items())
 
 
 def render(
@@ -378,6 +378,7 @@ def render(
     output_dir: Path = OUTPUT_DIR,
     title: str = "Where We've Eaten",
     limit: int | None = 20,
+    filename: str = "index.html",
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -437,6 +438,6 @@ def render(
             else "Diet"
         ),
     )
-    output = output_dir / "index.html"
+    output = output_dir / filename
     output.write_text(html, encoding="utf-8")
     return output

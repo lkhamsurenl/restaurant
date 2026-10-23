@@ -21,11 +21,12 @@ import anthropic
 
 from . import candidates as candidates_mod
 from . import overpass, store
+from .domains import Domain
 from .geo import haversine_km
 from .models import (
     Candidate,
+    summarize_scores,
     Library,
-    Ratings,
     Recommendation,
     RecommendationList,
     Recommendations,
@@ -43,12 +44,13 @@ MODEL = "claude-opus-5"
 # rated inside this exact circle.
 LOCAL_MULTIPLE = 3
 
-SYSTEM = """You recommend restaurants to one specific eater, in one specific \
-place, choosing from a list of real venues just retrieved from OpenStreetMap near \
-their target location.
+_SYSTEM_TEMPLATE = """{subject}
+
+You are choosing from a list of real venues just retrieved from OpenStreetMap \
+near the target location.
 
 What you are given:
-- GLOBAL TASTE: everywhere they have eaten and rated, with their own notes.
+- GLOBAL TASTE: everywhere they have been and rated, with their own notes.
 - LOCAL HISTORY: what they rated in or near the target area, with distances.
 - CANDIDATES: real OpenStreetMap venues near the target, one per line, each with \
 a `node/123` style reference.
@@ -56,53 +58,50 @@ a `node/123` style reference.
 How to choose:
 - Pick from CANDIDATES, and copy the reference from the line exactly into \
 `osm_ref`.
-- Extend the pattern you infer, do not mirror it. Their fifth Thai place is a \
-wasted slot when the notes say what they actually like is the chili heat and the \
-herbs. The obvious canonical restaurant in a cuisine they already eat weekly is a \
-wasted slot too.
+- Extend the pattern you infer, do not mirror it. A fifth version of the thing \
+they already have five of is a wasted slot when the notes say what they actually \
+like is one specific quality of it. The obvious canonical answer in a category \
+they already know well is a wasted slot too.
 - Ratings are 1-5. Treat 4-5 as the taste to extend, 3 as lukewarm - note what \
 was missing rather than chasing more of it - and 1-2 as a hard avoid-list, just \
 as informative as the high scores. Weight a 5 more heavily than a 4.
-- Some places carry per-attribute `scores` (food, vibe, quiet, service, value), \
-all 1-5 and all higher-is-better, so `quiet 1` means unpleasantly loud. Read them \
-against the HOW THEY SCORE averages rather than absolutely: a 4 on an attribute \
-they average 3.0 on is warm praise. A blank is not a zero, it means they did not \
-record a view.
+- Some places carry per-attribute `scores` ({attributes}), all 1-5 and all \
+higher-is-better. Read them against the HOW THEY SCORE averages rather than \
+absolutely: a 4 on an attribute they average 3.0 on is warm praise. A blank is \
+not a zero, it means they did not record a view.
 - WHAT SINKS A PLACE FOR THEM, when present, is the most actionable thing you are \
 given. The top entry there is close to a dealbreaker, and a candidate you suspect \
-fails on it is a bad pick however well the cuisine matches. Say in `avoids` how \
+fails on it is a bad pick however well it matches otherwise. Say in `avoids` how \
 your pick handles that specific attribute.
 - LOCAL HISTORY is the sharper instrument. A 5 they gave twenty minutes away \
 tells you more about what is good *here* than a 5 from another city. But do not \
 confine yourself to the local pattern - GLOBAL TASTE is what generalizes.
-- Distance within the listed radius is not a reason to prefer a place. This eater \
-will drive for a good fit, so a better restaurant 25km away beats a mediocre one \
-nearby. Use the distance column only to avoid stacking every pick in one town.
+- Distance within the listed radius is not a reason to prefer a place. They will \
+drive for a good fit, so a better place 25km away beats a mediocre one nearby. \
+Use the distance column only to avoid stacking every pick in one town.
 - If an ALREADY PASSED ON list is present, never pick anything on it, and do not \
 substitute the near-identical place three doors down, since that is the same \
 suggestion wearing a hat. Do not read taste into that list.
-- The candidate list is OpenStreetMap data. It carries no ratings, no reviews and \
-no popularity signal whatsoever. What you know about these specific named venues \
-is the only quality information in the room. Use it, and say plainly when you do \
-not have it rather than dressing up a guess.
+- {tag_caveat}
+- The candidate list carries no ratings, no reviews and no popularity signal \
+whatsoever. What you know about these specific named venues is the only quality \
+information in the room. Use it, and say plainly when you do not have it rather \
+than dressing up a guess.
 - A `stale` flag means nobody has surveyed the venue in five years and it may have \
 closed. Prefer `fresh` when a pick is otherwise a coin flip, and if you pick a \
 stale one anyway, say why in `reason`.
-- Spread the picks. Do not return eight versions of the same meal.
+- Spread the picks. Do not return eight versions of the same outing.
 
 If a DIETARY REQUIREMENT is given, it is a hard constraint and it outranks \
 everything else here, taste included:
-- Every pick must have real dishes someone on that diet can order - not a side \
-salad, not "they could probably adapt something". A substantial main.
-- A restaurant built around what they cannot eat is disqualified no matter how \
-good it is or how well it matches on every other axis. A tonkatsu specialist, a \
-yakiniku house or a fried-chicken place is the wrong answer for a pescatarian \
-even when the cooking is excellent, because there is nothing there for one of the \
-party to eat.
+- Every pick must have something substantial someone on that diet can actually \
+order - not a token side, not "they could probably adapt something".
+- A place built around what they cannot have is disqualified no matter how good \
+it is or how well it matches on every other axis.
 - Use what you know about each venue's actual menu. The candidate data cannot tell \
 you this: OpenStreetMap diet tags are present on well under 1% of these venues, so \
 their absence means nothing and you must not read it as a signal either way.
-- Fill in `diet_fit` for every pick, naming the specific dishes that work. If you \
+- Fill in `diet_fit` for every pick, naming the specific things that work. If you \
 cannot name any, do not return the pick at all - that is the test.
 - Where you are unsure whether a place has enough beyond the constraint, say so in \
 `diet_fit` and lower `confidence` accordingly.
@@ -110,8 +109,8 @@ cannot name any, do not return the pick at all - that is the test.
 For each recommendation:
 - `osm_ref` must be copied exactly from the candidate line. A pick whose reference \
 is not in the list is dropped afterward, so a mistyped one costs a slot.
-- `reason` must cite specific restaurants from their library by name and say what \
-thread connects them. Generic praise of the restaurant is useless.
+- `reason` must cite specific places from their library by name and say what \
+thread connects them. Generic praise of the venue is useless.
 - `avoids` must name the concrete trait this pick steers clear of, referencing a \
 low-rated place of theirs by name. If they have no low-rated places yet, say that \
 plainly rather than inventing a trait to avoid.
@@ -127,6 +126,22 @@ target area. Stay within the off-list budget given in the request, and use it on
 when you are confident the place exists and is still open."""
 
 
+def system_prompt(domain: Domain) -> str:
+    """Compose the prompt for one domain.
+
+    Built once per run rather than kept as a constant, because three things vary
+    with what is being judged: what the subject actually is, which attribute names
+    the scores use, and the specific way the tags mislead in that domain. The rest
+    - how to read ratings, the dealbreaker, the off-list budget - is the same
+    whether the outing is dinner or a cup of tea.
+    """
+    return _SYSTEM_TEMPLATE.format(
+        subject=domain.subject,
+        attributes=", ".join(domain.attribute_keys),
+        tag_caveat=domain.tag_caveat,
+    )
+
+
 def _token_budget(count: int) -> int:
     """Output allowance for a run of `count` picks.
 
@@ -139,7 +154,7 @@ def _token_budget(count: int) -> int:
     return min(64_000, 8_000 + count * 700)
 
 
-def attribute_profile(library: Library) -> list[str]:
+def attribute_profile(library: Library, domain: Domain) -> list[str]:
     """Describe how this eater uses the attribute scores, and what sinks a place.
 
     This is what the structured scores buy that a note cannot. Two things fall out
@@ -160,18 +175,16 @@ def attribute_profile(library: Library) -> list[str]:
         if r.rating is not None
         and r.status is not Status.NOT_INTERESTED
         and not r.boycott  # its low rating is about the business, not the meal
-        and r.ratings.any_set
+        and r.ratings
     ]
     if len(rated) < 3:
         return []
 
     lines: list[str] = []
     averages: dict[str, tuple[float, int]] = {}
-    for attribute in Ratings.FIELDS:
+    for attribute in domain.attribute_keys:
         scores = [
-            getattr(r.ratings, attribute)
-            for r in rated
-            if getattr(r.ratings, attribute) is not None
+            r.ratings[attribute] for r in rated if attribute in r.ratings
         ]
         if scores:
             averages[attribute] = (sum(scores) / len(scores), len(scores))
@@ -193,15 +206,9 @@ def attribute_profile(library: Library) -> list[str]:
     good = [r for r in rated if r.rating >= 4]
     poor = [r for r in rated if r.rating <= 3]
     gaps: list[tuple[float, str, str]] = []
-    for attribute in Ratings.FIELDS:
-        poor_scores = [
-            getattr(r.ratings, attribute) for r in poor
-            if getattr(r.ratings, attribute) is not None
-        ]
-        good_scores = [
-            getattr(r.ratings, attribute) for r in good
-            if getattr(r.ratings, attribute) is not None
-        ]
+    for attribute in domain.attribute_keys:
+        poor_scores = [r.ratings[attribute] for r in poor if attribute in r.ratings]
+        good_scores = [r.ratings[attribute] for r in good if attribute in r.ratings]
         if not poor_scores:
             continue
         poor_mean = sum(poor_scores) / len(poor_scores)
@@ -240,7 +247,11 @@ def attribute_profile(library: Library) -> list[str]:
     return lines
 
 
-def _format(restaurant: Restaurant, distance_km: float | None = None) -> str:
+def _format(
+    restaurant: Restaurant,
+    distance_km: float | None = None,
+    order: tuple[str, ...] = (),
+) -> str:
     parts = [f"- {restaurant.name}"]
     if restaurant.place_label != "location unknown":
         parts.append(f"— {restaurant.place_label}")
@@ -254,8 +265,8 @@ def _format(restaurant: Restaurant, distance_km: float | None = None) -> str:
         parts.append(f"({', '.join(restaurant.cuisine[:3])})")
 
     line = " ".join(parts)
-    if restaurant.ratings.any_set:
-        line += f"\n    scores: {restaurant.ratings.summary()}"
+    if restaurant.ratings:
+        line += f"\n    scores: {summarize_scores(restaurant.ratings, order)}"
     if restaurant.dishes:
         line += f"\n    dishes: {', '.join(restaurant.dishes)}"
     if restaurant.notes:
@@ -263,7 +274,7 @@ def _format(restaurant: Restaurant, distance_km: float | None = None) -> str:
     return line
 
 
-def build_profile(library: Library, target: Target) -> str:
+def build_profile(library: Library, target: Target, domain: Domain) -> str:
     """Serialize the library into global taste, local history, and suppression lists.
 
     A place appears in exactly one section. Local entries are omitted from the
@@ -320,7 +331,7 @@ def build_profile(library: Library, target: Target) -> str:
                 f"# {len(local)} more are near the target and appear under "
                 "LOCAL HISTORY instead."
             )
-        sections.extend(_format(r) for r, _ in globals_)
+        sections.extend(_format(r, order=domain.attribute_keys) for r, _ in globals_)
     elif local:
         # Everything they have rated is near this target - common for someone
         # asking about their own area. Saying "(none rated yet)" here would read as
@@ -341,7 +352,7 @@ def build_profile(library: Library, target: Target) -> str:
             f"{target.label} ({len(local)} places)",
             "# This is the sharper signal for this request: these are the actual "
             "options here.",
-            *(_format(r, d) for r, d in local),
+            *(_format(r, d, order=domain.attribute_keys) for r, d in local),
         ]
     else:
         sections += [
@@ -382,7 +393,7 @@ def build_profile(library: Library, target: Target) -> str:
             ),
         ]
 
-    attributes = attribute_profile(library)
+    attributes = attribute_profile(library, domain)
     if attributes:
         sections += ["", *attributes]
 
@@ -401,6 +412,7 @@ def build_profile(library: Library, target: Target) -> str:
 def generate(
     library: Library,
     target: Target,
+    domain: Domain,
     shortlist: list[Candidate],
     radius_used_m: int,
     pool: int,
@@ -416,17 +428,18 @@ def generate(
     ]
     if not liked:
         raise ValueError(
-            "No restaurants rated 4 or 5 yet. Add some with "
-            '`eats add "<name>" --city "<city>" --rating 5` before asking for '
-            "recommendations."
+            f"No {domain.plural} rated 4 or 5 yet. Add some with "
+            f'`{domain.name} add "<name>" --address "..." --rating 5` before '
+            "asking for recommendations."
         )
     if not shortlist:
         raise ValueError(
             f"No candidate venues found near {target.label}. Try a wider "
-            "--radius-km, or --kind cafe to include other venue types."
+            f"--radius-km, or --kind to widen the venue types "
+            f"(currently: {', '.join(domain.kinds)})."
         )
 
-    profile = build_profile(library, target)
+    profile = build_profile(library, target, domain)
     listing = candidates_mod.serialize(shortlist, target, radius_used_m, pool)
 
     client = anthropic.Anthropic()
@@ -439,7 +452,7 @@ def generate(
         model=MODEL,
         max_tokens=_token_budget(count),
         thinking={"type": "adaptive"},
-        system=SYSTEM,
+        system=system_prompt(domain),
         messages=[
             {
                 "role": "user",

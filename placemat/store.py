@@ -12,7 +12,7 @@ from pathlib import Path
 from .geo import haversine_km
 from .models import Library, Restaurant, Status, fold
 
-LIBRARY_PATH = Path("library.json")
+LIBRARY_PATH = Path("library.json")  # the restaurants domain; others pass their own
 
 
 def load(path: Path = LIBRARY_PATH) -> Library:

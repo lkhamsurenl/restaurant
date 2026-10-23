@@ -1,0 +1,26 @@
+{
+  "household": {
+    "diets": []
+  },
+  "restaurants": [
+    {
+      "address": "747 Queen St",
+      "boycott": false,
+      "city": "Honolulu",
+      "cuisine": [],
+      "dishes": [],
+      "lat": 21.2999552,
+      "location_source": "manual",
+      "lon": -157.8564156,
+      "name": "Ohana Hui",
+      "notes": "Highly recommend.",
+      "permanently_closed": false,
+      "rating": 5,
+      "ratings": {},
+      "state": "Hawaii",
+      "status": "visited",
+      "tags": [],
+      "zip": "96813"
+    }
+  ]
+}

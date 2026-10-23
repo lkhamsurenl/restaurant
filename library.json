@@ -7,6 +7,31 @@
   },
   "restaurants": [
     {
+      "address": "1613 Nuuanu Ave",
+      "boycott": false,
+      "city": "Honolulu",
+      "cuisine": [],
+      "dishes": [
+        "crab pasta"
+      ],
+      "lat": 21.3165302,
+      "location_source": "manual",
+      "lon": -157.8552791,
+      "name": "Chao Hawaii",
+      "notes": "Reasonably priced and extremely tasty. The crab pasta was the best. Went around 5:30pm on a Saturday and the place was buzzing - a little loud, but highly recommend.",
+      "permanently_closed": false,
+      "rating": 5,
+      "ratings": {
+        "food": 5,
+        "quiet": 3,
+        "value": 5
+      },
+      "state": "Hawaii",
+      "status": "visited",
+      "tags": [],
+      "zip": "96817"
+    },
+    {
       "address": "987 Queen St Apt 100",
       "boycott": false,
       "city": "Honolulu",

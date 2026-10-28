@@ -7,6 +7,7 @@
   },
   "restaurants": [
     {
+      "added": "2026-10-22",
       "address": "1613 Nuuanu Ave",
       "boycott": false,
       "city": "Honolulu",
@@ -32,6 +33,7 @@
       "zip": "96817"
     },
     {
+      "added": "2026-09-22",
       "address": "987 Queen St Apt 100",
       "boycott": false,
       "city": "Honolulu",
@@ -54,6 +56,7 @@
       "zip": "96814"
     },
     {
+      "added": "2026-09-25",
       "address": "10 North Hotel Street",
       "boycott": false,
       "city": "Honolulu",
@@ -81,6 +84,7 @@
       "website": "https://www.giovedihawaii.com/"
     },
     {
+      "added": "2026-09-22",
       "address": "2700 S King St",
       "amenity": "restaurant",
       "boycott": false,
@@ -109,6 +113,7 @@
       "zip": "96826"
     },
     {
+      "added": "2026-09-22",
       "address": "100 Holomoana St Ground Floor",
       "boycott": false,
       "city": "Honolulu",
@@ -131,6 +136,7 @@
       "zip": "96815"
     },
     {
+      "added": "2026-09-22",
       "address": "660 Ala Moana Blvd",
       "amenity": "restaurant",
       "boycott": false,
@@ -155,6 +161,7 @@
       "zip": "96813"
     },
     {
+      "added": "2026-09-23",
       "address": "66 North Hotel Street",
       "boycott": false,
       "city": "Honolulu",
@@ -186,6 +193,7 @@
       "website": "https://olaysthaihawaii.com"
     },
     {
+      "added": "2026-09-22",
       "address": "1000 Auahi St Unit 220",
       "boycott": false,
       "city": "Honolulu",
@@ -209,6 +217,7 @@
       "zip": "96814"
     },
     {
+      "added": "2026-09-22",
       "address": "57 Arizona Memorial Dr #108",
       "boycott": false,
       "city": "Honolulu",
@@ -231,6 +240,7 @@
       "zip": "96818"
     },
     {
+      "added": "2026-09-22",
       "address": "885 Kapahulu Ave",
       "amenity": "restaurant",
       "boycott": false,
@@ -259,6 +269,7 @@
       "zip": "96816"
     },
     {
+      "added": "2026-09-22",
       "address": "223 Saratoga Rd",
       "boycott": false,
       "city": "Honolulu",
@@ -281,6 +292,7 @@
       "zip": "96815"
     },
     {
+      "added": "2026-09-25",
       "address": "Olani Street",
       "boycott": false,
       "city": "Kapolei",
@@ -307,6 +319,7 @@
       "zip": "96707"
     },
     {
+      "added": "2026-09-22",
       "address": "92-1048 Olani St",
       "amenity": "restaurant",
       "boycott": false,
@@ -332,6 +345,7 @@
       "zip": "96707"
     },
     {
+      "added": "2026-09-22",
       "address": "92-1220 Aliinui Dr",
       "boycott": false,
       "city": "Kapolei",
@@ -355,6 +369,7 @@
       "zip": "96707"
     },
     {
+      "added": "2026-09-23",
       "address": "590 Farrington Highway",
       "boycott": true,
       "city": "Kapolei",

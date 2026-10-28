@@ -7,6 +7,7 @@ keys so git diffs stay readable and edits to different places don't collide.
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 from .geo import haversine_km
@@ -51,6 +52,7 @@ def upsert(library: Library, restaurant: Restaurant) -> bool:
         )
 
     if existing is None:
+        restaurant.added = restaurant.added or date.today().isoformat()
         library.restaurants.append(restaurant)
         return True
 

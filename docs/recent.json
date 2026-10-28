@@ -1,0 +1,42 @@
+{
+  "title": "Eating",
+  "url": "/restaurant/",
+  "summary": "15 places · 2 cities",
+  "items": [
+    {
+      "title": "Chao Hawaii",
+      "subtitle": "Honolulu, Hawaii",
+      "rating": 5,
+      "image": null,
+      "url": "/restaurant/#chao-hawaii"
+    },
+    {
+      "title": "Mina’s Fish House",
+      "subtitle": "Kapolei, Hawaii",
+      "rating": 5,
+      "image": null,
+      "url": "/restaurant/#minas-fish-house"
+    },
+    {
+      "title": "Giovedi",
+      "subtitle": "Honolulu, Hawaii",
+      "rating": 4,
+      "image": null,
+      "url": "/restaurant/#giovedi"
+    },
+    {
+      "title": "Olay's Thai Lao Cuisine",
+      "subtitle": "Honolulu, Hawaii",
+      "rating": 5,
+      "image": null,
+      "url": "/restaurant/#olays-thai-lao-cuisine"
+    },
+    {
+      "title": "Sushi Bay",
+      "subtitle": "Kapolei, Hawaii",
+      "rating": 2,
+      "image": null,
+      "url": "/restaurant/#sushi-bay"
+    }
+  ]
+}

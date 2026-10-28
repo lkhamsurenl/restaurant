@@ -81,6 +81,9 @@ class Restaurant(BaseModel):
     status: Status = Status.VISITED
     price: int | None = Field(default=None, ge=1, le=4)
     date_visited: str | None = None
+    # ISO date the place entered the library, set on add. What "recent" means on the
+    # site when date_visited is blank.
+    added: str | None = None
     notes: str | None = None
     dishes: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)

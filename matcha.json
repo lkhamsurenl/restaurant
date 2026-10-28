@@ -4,6 +4,7 @@
   },
   "restaurants": [
     {
+      "added": "2026-10-22",
       "address": "747 Queen St",
       "boycott": false,
       "city": "Honolulu",

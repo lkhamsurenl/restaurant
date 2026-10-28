@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import re
+import unicodedata
 from collections import defaultdict
 from pathlib import Path
 
@@ -14,6 +17,55 @@ from .models import Library, LocationSource, Recommendations, Restaurant, Status
 # GitHub Pages only serves from the repo root or /docs when deploying from a
 # branch - an arbitrary folder like site/ is not selectable.
 OUTPUT_DIR = Path("docs")
+
+# This page is one section of lkhamsurenl.github.io. The palette, fonts and
+# header styles live in the blog repo, so all sections change together. The URL
+# is absolute so a local docs/index.html still renders styled.
+SHARED_CSS = "https://lkhamsurenl.github.io/assets/shared.css"
+
+# Mirrors the blog's _data/navigation.yml; keep the two in step.
+NAV_LINKS = [
+    ("/posts/", "Writing"),
+    ("/books/", "Books"),
+    ("/restaurant/", "Restaurants"),
+    ("/about/", "About"),
+]
+
+
+def nav(current: str) -> str:
+    """The header shared by every section of the site."""
+    current_attr = ' aria-current="page"'
+    links = "".join(
+        f'<a href="{href}"{current_attr if href == current else ""}>{label}</a>'
+        for href, label in NAV_LINKS
+    )
+    return (
+        '<header class="site-nav"><nav class="inner">'
+        f'<a class="home" href="/">lkhamsurenl</a>{links}</nav></header>'
+    )
+
+
+def slugify(text: str) -> str:
+    """"Olay's Thai Lao Cuisine" -> "olays-thai-lao-cuisine"."""
+    ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    ascii_text = re.sub(r"['’]", "", ascii_text.lower())
+    return re.sub(r"[^a-z0-9]+", "-", ascii_text).strip("-")
+
+
+def _anchors(places: list[Restaurant]) -> list[str]:
+    """A stable, readable id per place, so posts can link to /restaurant/#chao-hawaii.
+
+    Built from the name alone so the link survives re-sorting and new places; a
+    second place with the same name (another branch, another city) gets a suffix.
+    """
+    seen: dict[str, int] = {}
+    anchors = []
+    for place in places:
+        base = slugify(place.name) or "place"
+        seen[base] = seen.get(base, 0) + 1
+        anchors.append(base if seen[base] == 1 else f"{base}-{seen[base]}")
+    return anchors
+
 
 RATING_COLORS = {5: "#2f7d5c", 4: "#6aa84f", 3: "#c9a227", 2: "#c1663c", 1: "#a63d3d"}
 
@@ -193,21 +245,18 @@ TEMPLATE = Template(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }}</title>
+<link rel="stylesheet" href="{{ shared_css }}">
 <style>
-  :root {
-    color-scheme: light dark;
-    --bg: #fbf9f6; --fg: #1c1a18; --muted: #6f6a63;
-    --card: #ffffff; --line: #e7e1d8; --accent: #b4552d; --coast: #c7d6da;
-  }
+  /* Palette, fonts and the header come from shared_css; the accent and the
+     map's coastline are ours. */
+  :root { --accent: #b4552d; --coast: #c7d6da; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #17161a; --fg: #ecebe8; --muted: #9b9892;
-            --card: #201f25; --line: #34313b; --accent: #e08a5f;
-            --coast: #3c4f56; }
+    :root { --accent: #e08a5f; --coast: #3c4f56; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--fg);
-         font: 16px/1.6 ui-serif, Georgia, serif; }
-  .wrap { max-width: 1000px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+         font: 16px/1.6 var(--font-body); }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
   h1 { font-size: 2rem; margin: 0 0 .25rem; letter-spacing: -.02em; }
   .sub { color: var(--muted); margin: 0 0 2.5rem; font-size: .95rem; }
   h2 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: .1em;
@@ -258,6 +307,7 @@ TEMPLATE = Template(
 </style>
 </head>
 <body>
+{{ site_nav }}
 <div class="wrap">
   <h1>{{ title }}</h1>
   <p class="sub">A personal record of where we've eaten, and what was worth it.
@@ -305,7 +355,7 @@ TEMPLATE = Template(
     {% if group.svg %}{{ group.svg }}{% endif %}
     <div class="grid">
     {% for r in group.places %}
-      <div class="card">
+      <div class="card" id="{{ r.anchor }}">
         {% if r.osm_url %}
         <a class="name" href="{{ r.osm_url }}">{{ r.name }}</a>
         {% else %}<span class="name">{{ r.name }}</span>{% endif %}
@@ -362,8 +412,9 @@ class _View:
 class _Shown(_View):
     """A restaurant as the page presents it."""
 
-    def __init__(self, restaurant: Restaurant) -> None:
+    def __init__(self, restaurant: Restaurant, anchor: str) -> None:
         super().__init__(restaurant)
+        self.anchor = anchor
         if not self.osm_url and restaurant.has_location:
             self.osm_url = osm_point_url(restaurant.lat, restaurant.lon)  # type: ignore[arg-type]
         self.approx = restaurant.location_source is LocationSource.REVERSE
@@ -384,6 +435,7 @@ def render(
 
     # Skipped places are suppression bookkeeping, not part of the collection.
     shown = [r for r in library.restaurants if r.status is not Status.NOT_INTERESTED]
+    anchor_of = dict(zip(map(id, library.restaurants), _anchors(library.restaurants)))
 
     by_city: dict[str, list[Restaurant]] = defaultdict(list)
     for restaurant in shown:
@@ -393,7 +445,11 @@ def render(
     for label in sorted(by_city, key=lambda k: (-len(by_city[k]), k)):
         places = sorted(by_city[label], key=lambda r: (-(r.rating or 0), r.name))
         groups.append(
-            {"label": label, "places": [_Shown(r) for r in places], "svg": _svg(places)}
+            {
+                "label": label,
+                "places": [_Shown(r, anchor_of[id(r)]) for r in places],
+                "svg": _svg(places),
+            }
         )
 
     # Publish the most confident picks first, and cap how many reach the page.
@@ -423,6 +479,8 @@ def render(
     scores = [r.rating for r in shown if r.rating]
     html = TEMPLATE.render(
         title=title,
+        shared_css=SHARED_CSS,
+        site_nav=nav("/restaurant/"),
         places=shown,
         groups=groups,
         cities=set(by_city),
@@ -440,4 +498,37 @@ def render(
     )
     output = output_dir / filename
     output.write_text(html, encoding="utf-8")
+    if filename == "index.html":
+        # Only the restaurants page feeds the blog's homepage; matcha stays a side page.
+        _write_recent(library, anchor_of, len(by_city), output_dir / "recent.json")
     return output
+
+
+RECENT_COUNT = 5
+
+
+def _write_recent(
+    library: Library, anchor_of: dict[int, str], cities: int, path: Path
+) -> None:
+    """The latest places, for the blog's homepage to show without knowing this schema.
+
+    Newest first by date visited, else date added; ties go to the better-rated place.
+    """
+    visited = [r for r in library.restaurants if r.status is Status.VISITED]
+    visited.sort(key=lambda r: (r.date_visited or r.added or "", r.rating or 0), reverse=True)
+    payload = {
+        "title": "Eating",
+        "url": "/restaurant/",
+        "summary": f"{len(visited)} places · {cities} cities",
+        "items": [
+            {
+                "title": r.name,
+                "subtitle": r.place_label,
+                "rating": r.rating,
+                "image": None,
+                "url": f"/restaurant/#{anchor_of[id(r)]}",
+            }
+            for r in visited[:RECENT_COUNT]
+        ],
+    }
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
